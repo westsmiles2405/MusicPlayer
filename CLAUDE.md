@@ -8,6 +8,7 @@
 
 - **目标平台**：macOS（首发，Mac App Store）+ Web（GitHub Pages）；Windows 推迟到 v1.x。
 - **项目性质**：个人作品集 → 演进为公开发布产品（GitHub 公开，MIT License）。
+- **当前版本**：v0.3.0（库扫描器已交付）→ v0.4.0（音频引擎）。
 - **当前阶段**：Phase 1 / v1.0 — **本地音乐播放器**（无后端、无 DRM）。
 - **完整设计**：见 `docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`。
 - **背景调研**：`Apple Music 风格音乐播放器分析报告.pdf`（项目根，14 页）。
@@ -63,28 +64,33 @@
 ```
 MusicPlayer/
 ├── src/                        # React 前端
-│   ├── pages/                  # 路由页（Library / Albums / AlbumDetail / ... / Settings）
+│   ├── pages/                  # LibraryPage / SettingsPage（路由 App.tsx）
 │   ├── components/{layout,player,library,ui,effects}/
+│   │   └── layout/ScanProgressBar.tsx   # 全局扫描进度条
 │   ├── stores/                 # Zustand: playerStore / uiStore / prefsStore
-│   ├── hooks/                  # usePlayer / useScanProgress / useColorTint
+│   ├── hooks/                  # useScanProgress (scan_progress/scan_done 事件)
 │   ├── repositories/           # ⚠️ 关键解耦层（Phase 2 切 HTTP 时只改这里）
 │   ├── lib/  i18n/  styles/
 │
 ├── src-tauri/                  # Rust 核心
 │   ├── tauri.conf.json
 │   ├── Cargo.toml
-│   ├── migrations/             # SQL 迁移文件 V1__init.sql ...
+│   ├── migrations/             # V1__init.sql / V2__fix_fts5_triggers.sql / V3__scanner_support.sql
+│   ├── tests/
+│   │   ├── scan_e2e.rs         # 端到端扫描测试（5 个 fixture）
+│   │   └── fixtures/audio/     # ffmpeg 生成的 1 秒静音 mp3/flac/m4a/wav/no-tag
 │   └── src/
 │       ├── main.rs
-│       ├── commands/           # Tauri IPC 命令（player/library/playlist/prefs）
-│       ├── player/             # symphonia + cpal + 队列 + Gapless
-│       ├── library/            # scanner / watcher / indexer
-│       ├── metadata/           # lofty 读取 + 封面缓存
-│       ├── db/                 # SQLite schema + 各表查询
-│       ├── system/now_playing.rs   # macOS MPNowPlayingInfoCenter 桥接
-│       └── error.rs            # 统一 AppError
+│       ├── commands/           # 命令面：add_music_folder / list_music_folders / remove_music_folder / start_scan / cancel_scan
+│       ├── player/             # symphonia + cpal + 队列 + Gapless（v0.4.0）
+│       ├── library/            # scanner（walk→reader→indexer 管道）/ watcher（v0.3.1）
+│       ├── metadata/           # reader（lofty + xxh3） / art（封面缓存，内容 hash 去重）
+│       ├── db/                 # tracks / albums / artists / playlists / scan_folders / search / schema
+│       ├── system/now_playing.rs
+│       └── error.rs            # AppError（含 Scan / Busy / Metadata / NotFound）
 │
-├── docs/superpowers/specs/     # 设计文档（spec）
+├── .worktrees/                 # git worktree（.gitignore 已排除）
+├── docs/superpowers/specs/     # 设计文档：Apple Music 风格 spec / v0.3.0 scanner spec
 ├── .github/workflows/          # ci.yml / release.yml / pages.yml
 └── CLAUDE.md  README.md  LICENSE
 ```
@@ -95,10 +101,12 @@ MusicPlayer/
 2. **库扫描在 Rust 后台线程**。前端通过 `scan_progress` / `scan_done` 事件订阅。
 3. **`src/repositories/` 是唯一允许调 Tauri 命令的地方**。`pages/` 和 `components/` 不直接调 IPC。
 4. **数据存放**：`~/Library/Application Support/<bundle-id>/`（用 Tauri `app_data_dir()`），Mac App Store 沙盒兼容。
-5. **`tracks.file_path` 是业务主键，`tracks.hash` 用于文件移动后的身份保留**。
-6. **错误分三档**：轻微（log）/ 中等（toast）/ 严重（模态阻塞）。统一从 `src-tauri/src/error.rs::AppError` 流到前端 ErrorBoundary。
-7. **i18next 必须在 `src/main.tsx` 顶部 side-effect import**（`import "@/i18n";`），否则被 Vite tree-shake，`useTranslation()` 拿不到资源。
-8. **Rust 子模块必须在父 `mod.rs` 里 `pub mod` 显式声明**（`commands/mod.rs` / `db/mod.rs`），否则 `tauri::generate_handler!` 找不到目标。
+5. **`tracks.file_path` 是业务主键，`tracks.hash` 用于文件移动后的身份保留**。扫描器 B1 快速路径：path 命中 → (mtime,size) 比较 → hash+size 查库（唯一命中则 Moved，多命中降级 Added）。
+6. **`Database` 内部用 `Arc<DatabaseInner>`**（`parking_lot::Mutex<Connection>`）。`Database: Clone + Send`，允许跨 `spawn_blocking` 边界持有的 clone 调用 `conn()`。
+7. **`tracks.root_folder_id` 实现多根目录隔离**。扫描时通过 `canonicalize_roots` 去重前缀过滤，删除文件夹时用 `mark_missing_by_root` + `unlink_root` 三步事务操作。
+8. **错误分三档**：轻微（log）/ 中等（toast）/ 严重（模态阻塞）。统一从 `src-tauri/src/error.rs::AppError` 流到前端 ErrorBoundary。新增 `AppError::Busy` 用于扫描互斥。
+9. **i18next 必须在 `src/main.tsx` 顶部 side-effect import**（`import "@/i18n";`），否则被 Vite tree-shake，`useTranslation()` 拿不到资源。
+10. **Rust 子模块必须在父 `mod.rs` 里 `pub mod` 显式声明**（`commands/mod.rs` / `db/mod.rs`），否则 `tauri::generate_handler!` 找不到目标。
 
 ## 6. 工程规范
 
@@ -116,7 +124,7 @@ MusicPlayer/
 
 ## 7. v1.0 必做功能（不要走偏）
 
-1. 本地音乐扫描（mp3/m4a/flac/wav/aac，递归 + ID3/iTunes 标签）
+1. ~~本地音乐扫描~~ ✅ v0.3.0（mp3/m4a/flac/wav/aac，递归 + lofty 标签 + xxh3 hash + 封面缓存）
 2. 资料库浏览（侧边栏：资料库 → 最近添加 / 艺人 / 专辑 / 歌曲）
 3. 专辑 / 艺人详情页（封面取色背景）
 4. 用户播放列表（CRUD + 拖拽排序）
@@ -152,8 +160,13 @@ cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 pnpm build                   # tsc + vite build；只想验前端配置/类型时用这个
 
 # 出包
-pnpm tauri build             # 本地出 DMG
+pnpm tauri build --debug --bundles app   # 仅出 .app（跳过签名，秒级验证）
+pnpm tauri build                         # 本地出 DMG（需签名配置）
 pnpm tauri build --target universal-apple-darwin   # Intel + ARM 通用
+
+# Rust 部分验证（不跑前端）
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 > **已知现象**：未配置代码签名时 `pnpm tauri build` 的 DMG 步骤会失败但 `.app` 已生成 — 是预期，不是 bug。
@@ -173,10 +186,14 @@ pnpm tauri build --target universal-apple-darwin   # Intel + ARM 通用
 - 写代码前先看 `repositories/` 是否已有抽象——避免在 `pages/` 里直接调 Tauri 命令。
 - 测试覆盖关键路径，**不追求 100%**；不写快照测试。
 - 用户偏好简洁回复 + 不输出冗长总结。
+- **功能开发用 git worktree**：`git worktree add .worktrees/<feature> -b feat/<feature>`，隔离 `main`。`.worktrees/` 已在 `.gitignore` 排除。
+- **验收前全部门禁必须过**：`cargo test + clippy + fmt` 和 `pnpm test + build + lint`。`pnpm tauri build --debug --bundles app` 验证 `.app` 生成。
 
 ## 11. 文档参考
 
 - 设计文档：`docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`
+- v0.3.0 scanner spec：`docs/superpowers/specs/2026-05-01-v0.3.0-library-scanner-design.md`
+- v0.3.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.3.0-library-scanner.md`
 - 调研报告：`Apple Music 风格音乐播放器分析报告.pdf`
 - Tauri 2 文档：https://tauri.app/start/
 - React 19：https://react.dev/
