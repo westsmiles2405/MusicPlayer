@@ -4,6 +4,7 @@ pub mod albums;
 pub mod artists;
 pub mod play_history;
 pub mod playlists;
+pub mod scan_folders;
 pub mod schema;
 pub mod search;
 pub mod tracks;
@@ -47,6 +48,18 @@ impl Database {
     {
         let guard = self.conn.lock();
         f(&guard)
+    }
+
+    /// 获取连接锁，用于需长时持有连接的操作（如扫描）。
+    pub fn lock_conn(&self) -> parking_lot::MutexGuard<'_, Connection> {
+        self.conn.lock()
+    }
+
+    /// 从已有 Connection 构造 Database（测试用）。
+    pub fn from_conn(conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(conn),
+        }
     }
 }
 

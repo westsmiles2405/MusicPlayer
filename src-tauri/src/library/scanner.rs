@@ -7,6 +7,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use crate::db::scan_folders as folders_repo;
+use crate::db::Database;
+use crate::error::AppResult;
+use crate::library::indexer;
+use crate::metadata::art;
+use crate::metadata::reader::{self, RawTrack};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanProgress {
@@ -103,6 +110,230 @@ fn has_audio_ext(p: &Path) -> bool {
             AUDIO_EXTS.contains(&lower.as_str())
         })
         .unwrap_or(false)
+}
+
+// ---------------------------------------------------------------------------
+// Scanner orchestrator (Task 3.3)
+// ---------------------------------------------------------------------------
+
+pub struct ScanContext<'a> {
+    pub db: &'a Database,
+    pub cache_dir: PathBuf,
+}
+
+const TXN_BATCH: usize = 50;
+
+pub fn scan_folders(
+    ctx: &ScanContext<'_>,
+    abort: &AbortFlag,
+    on_progress: &(dyn Fn(ScanProgress) + Sync),
+) -> AppResult<ScanReport> {
+    abort.reset();
+    let conn_guard = ctx.db.lock_conn();
+    let conn: &rusqlite::Connection = &conn_guard;
+
+    let folders = folders_repo::list(conn)?;
+    if folders.is_empty() {
+        return Ok(ScanReport::default());
+    }
+
+    let canon = canonicalize_roots(folders.iter().map(|f| PathBuf::from(&f.path)).collect());
+    let canon_to_id: Vec<(PathBuf, i64)> = folders
+        .iter()
+        .filter_map(|f| {
+            PathBuf::from(&f.path)
+                .canonicalize()
+                .ok()
+                .map(|c| (c, f.id))
+        })
+        .collect();
+
+    let files = walk_audio_files(&canon);
+    let total = files.len();
+    on_progress(ScanProgress {
+        done: 0,
+        total,
+        current_file: None,
+    });
+
+    let mut report = ScanReport::default();
+    let mut buffer: Vec<Result<RawTrack, ScanError>> = Vec::with_capacity(TXN_BATCH);
+    let mut done = 0usize;
+    let scan_id = now_ms();
+
+    for path in &files {
+        if abort.is_aborted() {
+            break;
+        }
+        let display_path = path.to_string_lossy().to_string();
+        match reader::read_track(path) {
+            Ok(raw) => buffer.push(Ok(raw)),
+            Err(e) => buffer.push(Err(ScanError {
+                path: display_path.clone(),
+                message: format!("{e}"),
+            })),
+        }
+        done += 1;
+
+        if buffer.len() >= TXN_BATCH || done == total {
+            commit_batch(
+                conn,
+                &ctx.cache_dir,
+                &canon_to_id,
+                &mut buffer,
+                scan_id,
+                &mut report,
+            )?;
+            on_progress(ScanProgress {
+                done,
+                total,
+                current_file: Some(display_path),
+            });
+        }
+    }
+
+    // Flush remaining if abort interrupted mid-batch
+    if !buffer.is_empty() {
+        commit_batch(
+            conn,
+            &ctx.cache_dir,
+            &canon_to_id,
+            &mut buffer,
+            scan_id,
+            &mut report,
+        )?;
+    }
+
+    // Mark missing within scanned roots.
+    // Use scan_id (the stamp on last_seen_at) as the threshold so tracks just
+    // scanned are NOT marked missing; only tracks from prior scans are.
+    let scanned_ids: Vec<i64> = canon_to_id.iter().map(|(_, id)| *id).collect();
+    if !scanned_ids.is_empty() && !abort.is_aborted() {
+        let missing = mark_missing_scanned_roots(conn, &scanned_ids, scan_id)?;
+        report.missing = missing;
+        for fid in &scanned_ids {
+            folders_repo::update_last_scanned(conn, *fid, scan_id).ok();
+        }
+    }
+
+    on_progress(ScanProgress {
+        done,
+        total,
+        current_file: None,
+    });
+    Ok(report)
+}
+
+fn commit_batch(
+    conn: &rusqlite::Connection,
+    cache_dir: &Path,
+    canon_to_id: &[(PathBuf, i64)],
+    buffer: &mut Vec<Result<RawTrack, ScanError>>,
+    scan_id: i64,
+    report: &mut ScanReport,
+) -> AppResult<()> {
+    let tx = conn.unchecked_transaction()?;
+    for item in buffer.drain(..) {
+        match item {
+            Ok(raw) => {
+                let root_id = match find_root_for_path(&raw.path, canon_to_id) {
+                    Some(id) => id,
+                    None => {
+                        report.errors.push(ScanError {
+                            path: raw.path.to_string_lossy().to_string(),
+                            message: "no matching scan_folder root".into(),
+                        });
+                        continue;
+                    }
+                };
+                let cover_rel = if let Some(bytes) = &raw.cover {
+                    art::cache_cover_bytes(bytes, cache_dir)
+                        .map_err(|e| {
+                            report.errors.push(ScanError {
+                                path: raw.path.to_string_lossy().to_string(),
+                                message: format!("cover: {e}"),
+                            });
+                        })
+                        .ok()
+                } else {
+                    None
+                };
+                match indexer::upsert_track(&tx, &raw, cover_rel.as_deref(), scan_id, root_id) {
+                    Ok(out) => match out.kind {
+                        indexer::UpsertKind::Added => report.added += 1,
+                        indexer::UpsertKind::Updated => report.updated += 1,
+                        indexer::UpsertKind::Moved => report.moved += 1,
+                        indexer::UpsertKind::Unchanged => report.unchanged += 1,
+                    },
+                    Err(e) => report.errors.push(ScanError {
+                        path: raw.path.to_string_lossy().to_string(),
+                        message: format!("upsert: {e}"),
+                    }),
+                }
+            }
+            Err(scan_err) => report.errors.push(scan_err),
+        }
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+fn find_root_for_path(p: &Path, canon_to_id: &[(PathBuf, i64)]) -> Option<i64> {
+    canon_to_id
+        .iter()
+        .filter(|(root, _)| p.starts_with(root))
+        .max_by_key(|(root, _)| root.as_os_str().len())
+        .map(|(_, id)| *id)
+}
+
+fn mark_missing_scanned_roots(
+    conn: &rusqlite::Connection,
+    root_ids: &[i64],
+    now_ms: i64,
+) -> AppResult<usize> {
+    let placeholders = std::iter::repeat_n("?", root_ids.len())
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "UPDATE tracks SET missing_at = ?1, updated_at = ?1
+          WHERE missing_at IS NULL
+            AND last_seen_at < ?1
+            AND root_folder_id IN ({placeholders})"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(now_ms)];
+    for id in root_ids {
+        params.push(Box::new(*id));
+    }
+    Ok(stmt.execute(rusqlite::params_from_iter(
+        params.iter().map(|p| p.as_ref()),
+    ))?)
+}
+
+fn now_ms() -> i64 {
+    use std::sync::atomic::AtomicI64;
+    static LAST: AtomicI64 = AtomicI64::new(0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    // Ensure strictly-increasing values; rapid successive calls within the
+    // same millisecond must not return the same stamp.
+    loop {
+        let prev = LAST.load(std::sync::atomic::Ordering::Relaxed);
+        let next = std::cmp::max(now, prev + 1);
+        if LAST
+            .compare_exchange(
+                prev,
+                next,
+                std::sync::atomic::Ordering::Relaxed,
+                std::sync::atomic::Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            return next;
+        }
+    }
 }
 
 #[cfg(test)]

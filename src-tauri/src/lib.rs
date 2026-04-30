@@ -1,7 +1,7 @@
 mod commands;
-mod db;
-mod error;
-mod library;
+pub mod db;
+pub mod error;
+pub mod library;
 mod metadata;
 mod player;
 mod system;
