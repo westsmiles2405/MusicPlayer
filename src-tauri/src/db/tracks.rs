@@ -697,7 +697,7 @@ mod tests {
                     t.root_folder_id
                FROM tracks t WHERE t.id = ?1",
                 [id],
-                |row| Track::from_row(row),
+                Track::from_row,
             )
             .unwrap();
         assert_eq!(t.root_folder_id, Some(10));

@@ -11,10 +11,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
         2,
         include_str!("../../migrations/V2__fix_fts5_triggers.sql"),
     ),
-    (
-        3,
-        include_str!("../../migrations/V3__scanner_support.sql"),
-    ),
+    (3, include_str!("../../migrations/V3__scanner_support.sql")),
 ];
 
 /// 按 schema_migrations 表中的最新版本号增量执行所有未应用迁移。
@@ -172,7 +169,9 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         apply_pending(&conn).unwrap();
         let v: i64 = conn
-            .query_row("SELECT MAX(version) FROM schema_migrations", [], |r| r.get(0))
+            .query_row("SELECT MAX(version) FROM schema_migrations", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(v, 3, "expected V3 applied, got version={v}");
 
