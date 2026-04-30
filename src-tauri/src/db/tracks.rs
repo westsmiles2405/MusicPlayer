@@ -335,28 +335,7 @@ mod tests {
     use crate::db::{albums, artists, testing::test_db};
 
     pub(crate) fn make_basic_track(conn: &Connection, title: &str) -> i64 {
-        let artist = artists::upsert_by_name(conn, "TestArtist", 100).unwrap();
-        let album = albums::upsert(conn, "TestAlbum", artist, Some(2024), 100).unwrap();
-        let nt = NewTrack {
-            file_path: format!("/music/{title}.mp3"),
-            file_size: 4_000_000,
-            file_modified_at: 1000,
-            hash: Some(format!("hash-{title}")),
-            title: title.into(),
-            album_id: Some(album),
-            primary_artist_id: Some(artist),
-            album_artist_id: Some(artist),
-            track_no: Some(1),
-            disc_no: Some(1),
-            year: Some(2024),
-            genre: Some("Indie".into()),
-            duration_ms: 240_000,
-            bitrate: Some(320),
-            sample_rate: Some(44_100),
-            channels: Some(2),
-            codec: Some("mp3".into()),
-        };
-        insert(conn, &nt, 100).unwrap()
+        crate::db::testing::make_basic_track(conn, title)
     }
 
     #[test]
