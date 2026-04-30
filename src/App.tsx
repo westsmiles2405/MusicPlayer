@@ -1,7 +1,7 @@
 import { Routes, Route, Link, useLocation } from "react-router";
 import { ScanProgressBar } from "@/components/layout/ScanProgressBar";
-import { LibraryPage } from "@/pages/LibraryPage";
-import { SettingsPage } from "@/pages/SettingsPage";
+import LibraryPage from "@/pages/LibraryPage";
+import SettingsPage from "@/pages/SettingsPage";
 
 function Nav() {
   const { pathname } = useLocation();
