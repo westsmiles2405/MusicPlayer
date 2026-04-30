@@ -1,0 +1,51 @@
+{
+  "name": "musicplayer",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Apple Music style desktop music player built with Tauri 2.x + React 19",
+  "license": "MIT",
+  "author": "",
+  "packageManager": "pnpm@10.6.5",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ && prettier --check src/",
+    "lint:fix": "eslint --fix src/ && prettier --write src/"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.100",
+    "@tauri-apps/api": "^2.10",
+    "@tauri-apps/plugin-dialog": "^2.7",
+    "@tauri-apps/plugin-fs": "^2.5",
+    "framer-motion": "^12.38",
+    "i18next": "^26.0",
+    "lucide-react": "^1.14",
+    "react": "^19.2",
+    "react-dom": "^19.2",
+    "react-i18next": "^17.0",
+    "react-router": "^7.14",
+    "zustand": "^5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2",
+    "@tauri-apps/cli": "^2.10",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
+    "@types/react": "^19.0",
+    "@types/react-dom": "^19.0",
+    "@vitejs/plugin-react": "^4",
+    "eslint": "^9",
+    "jsdom": "^25",
+    "prettier": "^3",
+    "tailwindcss": "^4.2",
+    "typescript": "^5.7",
+    "vite": "^6",
+    "vitest": "^3"
+  }
+}
