@@ -97,6 +97,11 @@ impl Track {
             updated_at: row.get("updated_at")?,
         })
     }
+
+    #[doc(hidden)]
+    pub(crate) fn from_row_via_helper(row: &Row<'_>) -> rusqlite::Result<Self> {
+        Self::from_row(row)
+    }
 }
 
 /// 插入单首歌；同时把 (track_id, primary_artist_id) 写到 track_artists（role='main', position=0）。
@@ -218,6 +223,112 @@ pub fn link_artist(conn: &Connection, track_id: i64, artist_id: i64, role: &str,
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TrackSort {
+    Title,
+    Artist,
+    Album,
+    AddedAt,
+    LastPlayed,
+}
+
+/// 列表查询。`missing_at IS NULL` 自动过滤已软删除的歌曲。
+pub fn list(conn: &Connection, sort: TrackSort, limit: i64, offset: i64) -> AppResult<Vec<TrackView>> {
+    let order_by = match sort {
+        TrackSort::Title => "t.title COLLATE NOCASE ASC",
+        TrackSort::Artist => "ar.name COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC",
+        TrackSort::Album => "al.name COLLATE NOCASE ASC, t.disc_no, t.track_no",
+        TrackSort::AddedAt => "t.added_at DESC",
+        TrackSort::LastPlayed => "t.last_played_at DESC NULLS LAST",
+    };
+    let sql = format!("{} ORDER BY {order_by} LIMIT ?1 OFFSET ?2", base_track_view_select(" WHERE t.missing_at IS NULL"));
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![limit, offset], track_view_from_row)?;
+    collect(rows)
+}
+
+pub fn get_view_by_id(conn: &Connection, id: i64) -> AppResult<Option<TrackView>> {
+    let sql = format!("{} WHERE t.id = ?1", base_track_view_select(""));
+    let opt = conn.query_row(&sql, params![id], track_view_from_row).optional()?;
+    Ok(opt)
+}
+
+pub fn list_by_album(conn: &Connection, album_id: i64) -> AppResult<Vec<TrackView>> {
+    let sql = format!(
+        "{} ORDER BY t.disc_no NULLS LAST, t.track_no NULLS LAST, t.title COLLATE NOCASE",
+        base_track_view_select(" WHERE t.album_id = ?1 AND t.missing_at IS NULL"),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![album_id], track_view_from_row)?;
+    collect(rows)
+}
+
+pub fn list_by_artist(conn: &Connection, artist_id: i64) -> AppResult<Vec<TrackView>> {
+    let sql = format!(
+        "{} JOIN track_artists ta ON ta.track_id = t.id WHERE ta.artist_id = ?1 AND t.missing_at IS NULL ORDER BY t.title COLLATE NOCASE",
+        base_track_view_select(""),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![artist_id], track_view_from_row)?;
+    collect(rows)
+}
+
+pub fn recently_added(conn: &Connection, limit: i64) -> AppResult<Vec<TrackView>> {
+    let sql = format!(
+        "{} ORDER BY t.added_at DESC LIMIT ?1",
+        base_track_view_select(" WHERE t.missing_at IS NULL"),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map(params![limit], track_view_from_row)?;
+    collect(rows)
+}
+
+pub fn set_favorite(conn: &Connection, id: i64, favorite: bool, now_ms: i64) -> AppResult<()> {
+    let n = conn.execute(
+        "UPDATE tracks SET is_favorite = ?1, updated_at = ?2 WHERE id = ?3",
+        params![favorite as i64, now_ms, id],
+    )?;
+    if n == 0 {
+        return Err(crate::error::AppError::NotFound(format!("track {id}")));
+    }
+    Ok(())
+}
+
+// ---- internal helpers ----
+
+fn base_track_view_select(extra_where: &str) -> String {
+    format!(
+        "SELECT t.id, t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
+                t.album_id, t.primary_artist_id, t.album_artist_id,
+                t.track_no, t.disc_no, t.year, t.genre,
+                t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
+                t.is_favorite, t.play_count, t.last_played_at,
+                t.last_seen_at, t.missing_at, t.added_at, t.updated_at,
+                al.name AS album_name,
+                ar.name AS primary_artist_name
+         FROM tracks t
+         LEFT JOIN albums al ON al.id = t.album_id
+         LEFT JOIN artists ar ON ar.id = t.primary_artist_id{extra_where}",
+    )
+}
+
+fn track_view_from_row(row: &Row<'_>) -> rusqlite::Result<TrackView> {
+    Ok(TrackView {
+        track: Track::from_row(row)?,
+        album_name: row.get("album_name")?,
+        primary_artist_name: row.get("primary_artist_name")?,
+    })
+}
+
+fn collect<T, I>(iter: I) -> AppResult<Vec<T>>
+where I: IntoIterator<Item = rusqlite::Result<T>>
+{
+    let mut out = Vec::new();
+    for r in iter { out.push(r?); }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,6 +435,70 @@ mod tests {
         link_artist(&conn, id, other, "featured", 0).unwrap();  // 第二次必须不报错
         let n: i64 = conn.query_row("SELECT COUNT(*) FROM track_artists WHERE track_id=?1", params![id], |r| r.get(0)).unwrap();
         assert_eq!(n, 2, "main + featured");
+    }
+
+    #[test]
+    fn list_returns_track_view_with_album_and_artist_names() {
+        let conn = test_db();
+        let _ = make_basic_track(&conn, "Song1");
+        let views = list(&conn, TrackSort::Title, 100, 0).unwrap();
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].album_name.as_deref(), Some("TestAlbum"));
+        assert_eq!(views[0].primary_artist_name.as_deref(), Some("TestArtist"));
+    }
+
+    #[test]
+    fn list_excludes_missing_tracks() {
+        let conn = test_db();
+        let id = make_basic_track(&conn, "Hidden");
+        mark_missing(&conn, &[id], 1000).unwrap();
+        let views = list(&conn, TrackSort::Title, 100, 0).unwrap();
+        assert!(views.is_empty());
+    }
+
+    #[test]
+    fn list_by_album_orders_by_disc_and_track_no() {
+        let conn = test_db();
+        let _ = make_basic_track(&conn, "Track1");  // track_no=1
+        let artist = artists::find_by_name(&conn, "TestArtist").unwrap().unwrap().id;
+        let album = albums::upsert(&conn, "TestAlbum", artist, Some(2024), 100).unwrap();
+        let nt2 = NewTrack {
+            file_path: "/music/Track0.mp3".into(),
+            file_size: 1, file_modified_at: 0, hash: None, title: "Track0".into(),
+            album_id: Some(album), primary_artist_id: Some(artist), album_artist_id: Some(artist),
+            track_no: Some(0), disc_no: Some(1), year: None, genre: None,
+            duration_ms: 0, bitrate: None, sample_rate: None, channels: None, codec: None,
+        };
+        insert(&conn, &nt2, 100).unwrap();
+        let views = list_by_album(&conn, album).unwrap();
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].track.track_no, Some(0));
+        assert_eq!(views[1].track.track_no, Some(1));
+    }
+
+    #[test]
+    fn recently_added_orders_desc_by_added_at() {
+        let conn = test_db();
+        let id_old = make_basic_track(&conn, "Old");
+        // 手动改 added_at 让"Old"早于另一首
+        conn.execute("UPDATE tracks SET added_at = 100 WHERE id = ?1", params![id_old]).unwrap();
+        let _id_new = make_basic_track(&conn, "New");
+        conn.execute("UPDATE tracks SET added_at = 999 WHERE file_path = '/music/New.mp3'", []).unwrap();
+        let views = recently_added(&conn, 10).unwrap();
+        assert_eq!(views[0].track.title, "New");
+        assert_eq!(views[1].track.title, "Old");
+    }
+
+    #[test]
+    fn set_favorite_toggles() {
+        let conn = test_db();
+        let id = make_basic_track(&conn, "Star");
+        set_favorite(&conn, id, true, 1000).unwrap();
+        let v = get_view_by_id(&conn, id).unwrap().unwrap();
+        assert!(v.track.is_favorite);
+        set_favorite(&conn, id, false, 2000).unwrap();
+        let v = get_view_by_id(&conn, id).unwrap().unwrap();
+        assert!(!v.track.is_favorite);
     }
 }
 
