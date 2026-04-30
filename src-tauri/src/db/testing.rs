@@ -35,6 +35,7 @@ pub(crate) fn make_basic_track(conn: &Connection, title: &str) -> i64 {
         sample_rate: Some(44_100),
         channels: Some(2),
         codec: Some("mp3".into()),
+        root_folder_id: None,
     };
     crate::db::tracks::insert(conn, &nt, 100).unwrap()
 }

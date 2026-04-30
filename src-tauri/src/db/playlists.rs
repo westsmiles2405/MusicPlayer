@@ -102,6 +102,7 @@ pub fn get_tracks(
                 t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
                 t.is_favorite, t.play_count, t.last_played_at,
                 t.last_seen_at, t.missing_at, t.added_at, t.updated_at,
+                t.root_folder_id,
                 al.name AS album_name,
                 ar.name AS primary_artist_name
          FROM playlist_tracks pt
@@ -250,6 +251,7 @@ mod tests {
                 sample_rate: None,
                 channels: None,
                 codec: None,
+                root_folder_id: None,
             };
             crate::db::tracks::insert(conn, &nt, 100).unwrap()
         };
