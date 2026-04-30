@@ -1,10 +1,18 @@
 //! Library IPC commands. Each command takes State<Database> and delegates to db::*.
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::db::{albums, artists, play_history, playlists, search, tracks, Database};
+use crate::db::{
+    albums, artists, play_history, scan_folders as folders_repo, search, tracks, Database,
+};
 use crate::error::{AppError, AppResult};
+use crate::library::scanner::{self, AbortFlag, ScanProgress, ScanReport};
+
+// ---- query params ----
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +39,24 @@ fn now_ms() -> i64 {
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
 }
+
+// ---- scan state managed by Tauri ----
+
+pub struct ScanManager {
+    pub running: Arc<AtomicBool>,
+    pub abort: AbortFlag,
+}
+
+impl Default for ScanManager {
+    fn default() -> Self {
+        Self {
+            running: Arc::new(AtomicBool::new(false)),
+            abort: AbortFlag::new(),
+        }
+    }
+}
+
+// ---- existing library query commands ----
 
 #[tauri::command]
 pub async fn get_tracks(
@@ -111,18 +137,109 @@ pub async fn search(
     db.with_conn(|c| search::search_tracks(c, &query, limit.unwrap_or(50)))
 }
 
-/// 占位：v0.3.0 的 scanner 任务里再实现真正逻辑。
-/// 当前只把路径写进 scan_folders 表；扫描动作不做。
+// ---- scan-folder CRUD commands ----
+
 #[tauri::command]
-pub async fn add_folder(db: State<'_, Database>, path: String) -> AppResult<()> {
-    db.with_conn(|c| -> AppResult<()> {
-        c.execute(
-            "INSERT OR IGNORE INTO scan_folders (path, added_at) VALUES (?1, ?2)",
-            rusqlite::params![path, now_ms()],
-        )?;
-        Ok(())
-    })?;
-    let _ = playlists::list; // 抑制未使用警告
-    let _ = AppError::NotFound("".into());
+pub fn add_music_folder(
+    db: State<'_, Database>,
+    path: String,
+) -> AppResult<folders_repo::ScanFolder> {
+    let now = now_ms();
+    folders_repo::add(&db.lock_conn(), &path, now)
+}
+
+#[tauri::command]
+pub fn list_music_folders(db: State<'_, Database>) -> AppResult<Vec<folders_repo::ScanFolder>> {
+    folders_repo::list(&db.lock_conn())
+}
+
+#[tauri::command]
+pub fn remove_music_folder(db: State<'_, Database>, id: i64) -> AppResult<()> {
+    let now = now_ms();
+    let conn = db.lock_conn();
+    let _ = tracks::mark_missing_by_root(&conn, id, now)?;
+    let _ = tracks::unlink_root(&conn, id)?;
+    folders_repo::delete(&conn, id)
+}
+
+// ---- scan control commands ----
+
+#[tauri::command]
+pub async fn start_scan(
+    app: AppHandle,
+    db: State<'_, Database>,
+    manager: State<'_, ScanManager>,
+) -> AppResult<()> {
+    if manager
+        .running
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err(AppError::Busy);
+    }
+
+    let abort = manager.abort.clone();
+    abort.reset();
+    let db_for_scan: Database = (*db).clone();
+    let running = Arc::clone(&manager.running);
+
+    let cache_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Scan(format!("app_data_dir: {e}")))?
+        .join("covers");
+    std::fs::create_dir_all(&cache_dir).ok();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let ctx = scanner::ScanContext {
+            db: &db_for_scan,
+            cache_dir,
+        };
+        let last_emit = std::sync::Mutex::new(None::<Instant>);
+        let on_progress = |p: ScanProgress| {
+            let mut last = last_emit.lock().unwrap();
+            let now = Instant::now();
+            let should = last
+                .map(|t| now.duration_since(t) >= Duration::from_millis(100))
+                .unwrap_or(true);
+            if should {
+                *last = Some(now);
+                let _ = app.emit("scan_progress", &p);
+            }
+        };
+        let result = scanner::scan_folders(&ctx, &abort, &on_progress);
+        match result {
+            Ok(report) => {
+                let _ = app.emit("scan_done", &report);
+            }
+            Err(e) => {
+                let err = ScanReport {
+                    errors: vec![scanner::ScanError {
+                        path: String::new(),
+                        message: format!("{e}"),
+                    }],
+                    ..Default::default()
+                };
+                let _ = app.emit("scan_done", &err);
+            }
+        }
+        running.store(false, Ordering::SeqCst);
+    });
+
     Ok(())
+}
+
+#[tauri::command]
+pub fn cancel_scan(manager: State<'_, ScanManager>) -> AppResult<()> {
+    manager.abort.signal();
+    Ok(())
+}
+
+// ---- legacy alias ----
+
+/// 向后兼容旧 API：v0.3.0 之前 add_folder 只写 scan_folders 表不做扫描。
+/// 现在等同于 add_music_folder。
+#[tauri::command]
+pub fn add_folder(db: State<'_, Database>, path: String) -> AppResult<()> {
+    add_music_folder(db, path).map(|_| ())
 }

@@ -15,12 +15,19 @@ pub(crate) mod testing;
 use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::error::AppResult;
 
 /// 持有 SQLite 连接 + WAL 模式 + 已应用迁移。
 /// 注册为 `tauri::State<Database>` 后被所有 IPC 命令共享。
+/// 用 Arc 包裹内部以便 Clone，支持 spawn_blocking 中跨线程使用。
+#[derive(Clone)]
 pub struct Database {
+    inner: Arc<DatabaseInner>,
+}
+
+struct DatabaseInner {
     conn: Mutex<Connection>,
 }
 
@@ -36,7 +43,9 @@ impl Database {
         )?;
         schema::apply_pending(&conn)?;
         Ok(Self {
-            conn: Mutex::new(conn),
+            inner: Arc::new(DatabaseInner {
+                conn: Mutex::new(conn),
+            }),
         })
     }
 
@@ -46,19 +55,21 @@ impl Database {
     where
         F: FnOnce(&Connection) -> T,
     {
-        let guard = self.conn.lock();
+        let guard = self.inner.conn.lock();
         f(&guard)
     }
 
     /// 获取连接锁，用于需长时持有连接的操作（如扫描）。
     pub fn lock_conn(&self) -> parking_lot::MutexGuard<'_, Connection> {
-        self.conn.lock()
+        self.inner.conn.lock()
     }
 
     /// 从已有 Connection 构造 Database（测试用）。
     pub fn from_conn(conn: Connection) -> Self {
         Self {
-            conn: Mutex::new(conn),
+            inner: Arc::new(DatabaseInner {
+                conn: Mutex::new(conn),
+            }),
         }
     }
 }
