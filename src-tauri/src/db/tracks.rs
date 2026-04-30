@@ -34,6 +34,7 @@ pub struct Track {
     pub missing_at: Option<i64>,
     pub added_at: i64,
     pub updated_at: i64,
+    pub root_folder_id: Option<i64>,
 }
 
 /// 列表/搜索用的反规范化视图：附带专辑名 / 主艺人名，省一次 round-trip。
@@ -66,6 +67,7 @@ pub struct NewTrack {
     pub sample_rate: Option<i32>,
     pub channels: Option<i32>,
     pub codec: Option<String>,
+    pub root_folder_id: Option<i64>,
 }
 
 impl Track {
@@ -96,6 +98,7 @@ impl Track {
             missing_at: row.get("missing_at")?,
             added_at: row.get("added_at")?,
             updated_at: row.get("updated_at")?,
+            root_folder_id: row.get("root_folder_id")?,
         })
     }
 
@@ -116,14 +119,16 @@ pub fn insert(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult<i64> {
             track_no, disc_no, year, genre,
             duration_ms, bitrate, sample_rate, channels, codec,
             is_favorite, play_count, last_played_at,
-            last_seen_at, missing_at, added_at, updated_at
+            last_seen_at, missing_at, added_at, updated_at,
+            root_folder_id
          ) VALUES (
             ?1, ?2, ?3, ?4, ?5,
             ?6, ?7, ?8,
             ?9, ?10, ?11, ?12,
             ?13, ?14, ?15, ?16, ?17,
             0, 0, NULL,
-            ?18, NULL, ?18, ?18
+            ?18, NULL, ?18, ?18,
+            ?19
          )",
         params![
             t.file_path,
@@ -144,6 +149,7 @@ pub fn insert(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult<i64> {
             t.channels,
             t.codec,
             now_ms,
+            t.root_folder_id,
         ],
     )?;
     let id = tx.last_insert_rowid();
@@ -154,6 +160,58 @@ pub fn insert(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult<i64> {
         )?;
     }
     tx.commit()?;
+    Ok(id)
+}
+
+/// 在已有事务中插入 track（不打开新事务）。
+pub fn insert_in_tx(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult<i64> {
+    conn.execute(
+        "INSERT INTO tracks (
+            file_path, file_size, file_modified_at, hash, title,
+            album_id, primary_artist_id, album_artist_id,
+            track_no, disc_no, year, genre,
+            duration_ms, bitrate, sample_rate, channels, codec,
+            is_favorite, play_count, last_played_at,
+            last_seen_at, missing_at, added_at, updated_at,
+            root_folder_id
+         ) VALUES (
+            ?1, ?2, ?3, ?4, ?5,
+            ?6, ?7, ?8,
+            ?9, ?10, ?11, ?12,
+            ?13, ?14, ?15, ?16, ?17,
+            0, 0, NULL,
+            ?18, NULL, ?18, ?18,
+            ?19
+         )",
+        params![
+            t.file_path,
+            t.file_size,
+            t.file_modified_at,
+            t.hash,
+            t.title,
+            t.album_id,
+            t.primary_artist_id,
+            t.album_artist_id,
+            t.track_no,
+            t.disc_no,
+            t.year,
+            t.genre,
+            t.duration_ms,
+            t.bitrate,
+            t.sample_rate,
+            t.channels,
+            t.codec,
+            now_ms,
+            t.root_folder_id,
+        ],
+    )?;
+    let id = conn.last_insert_rowid();
+    if let Some(aid) = t.primary_artist_id {
+        conn.execute(
+            "INSERT OR IGNORE INTO track_artists (track_id, artist_id, role, position) VALUES (?1, ?2, 'main', 0)",
+            params![id, aid],
+        )?;
+    }
     Ok(id)
 }
 
@@ -177,7 +235,8 @@ pub fn update_by_path(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult
             album_id = ?6, primary_artist_id = ?7, album_artist_id = ?8,
             track_no = ?9, disc_no = ?10, year = ?11, genre = ?12,
             duration_ms = ?13, bitrate = ?14, sample_rate = ?15, channels = ?16, codec = ?17,
-            last_seen_at = ?18, missing_at = NULL, updated_at = ?18
+            last_seen_at = ?18, missing_at = NULL, updated_at = ?18,
+            root_folder_id = ?19
          WHERE id = ?1",
         params![
             id,
@@ -198,9 +257,95 @@ pub fn update_by_path(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult
             t.channels,
             t.codec,
             now_ms,
+            t.root_folder_id,
         ],
     )?;
     Ok(id)
+}
+
+/// 在已有事务中按 file_path 整行覆盖。
+pub fn update_by_path_in_tx(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult<i64> {
+    let n = conn.execute(
+        "UPDATE tracks
+            SET file_size = ?2, file_modified_at = ?3, hash = ?4, title = ?5,
+                album_id = ?6, primary_artist_id = ?7, album_artist_id = ?8,
+                track_no = ?9, disc_no = ?10, year = ?11, genre = ?12,
+                duration_ms = ?13, bitrate = ?14, sample_rate = ?15,
+                channels = ?16, codec = ?17,
+                last_seen_at = ?18, missing_at = NULL, updated_at = ?18,
+                root_folder_id = ?19
+          WHERE file_path = ?1",
+        params![
+            t.file_path,
+            t.file_size,
+            t.file_modified_at,
+            t.hash,
+            t.title,
+            t.album_id,
+            t.primary_artist_id,
+            t.album_artist_id,
+            t.track_no,
+            t.disc_no,
+            t.year,
+            t.genre,
+            t.duration_ms,
+            t.bitrate,
+            t.sample_rate,
+            t.channels,
+            t.codec,
+            now_ms,
+            t.root_folder_id,
+        ],
+    )?;
+    if n == 0 {
+        return Err(crate::error::AppError::NotFound(format!(
+            "track path {}",
+            t.file_path
+        )));
+    }
+    let id: i64 = conn.query_row(
+        "SELECT id FROM tracks WHERE file_path = ?1",
+        [&t.file_path],
+        |r| r.get(0),
+    )?;
+    Ok(id)
+}
+
+/// 在已有事务中标记单首 track 重新出现（清除 missing_at，更新 last_seen_at）。
+pub fn mark_present_in_tx(conn: &Connection, track_id: i64, now_ms: i64) -> AppResult<()> {
+    conn.execute(
+        "UPDATE tracks SET missing_at = NULL, last_seen_at = ?1, updated_at = ?1 WHERE id = ?2",
+        params![now_ms, track_id],
+    )?;
+    Ok(())
+}
+
+/// 文件移动检测：对 hash 匹配的 track 更新路径/mtime/size/root。
+pub fn update_path_for_move_in_tx(
+    conn: &Connection,
+    track_id: i64,
+    new_path: &str,
+    file_size: i64,
+    file_modified_at: i64,
+    now_ms: i64,
+    root_folder_id: Option<i64>,
+) -> AppResult<()> {
+    conn.execute(
+        "UPDATE tracks
+            SET file_path = ?2, file_size = ?3, file_modified_at = ?4,
+                last_seen_at = ?5, missing_at = NULL, updated_at = ?5,
+                root_folder_id = ?6
+          WHERE id = ?1",
+        params![
+            track_id,
+            new_path,
+            file_size,
+            file_modified_at,
+            now_ms,
+            root_folder_id,
+        ],
+    )?;
+    Ok(())
 }
 
 /// 软删除：设置 missing_at = now，保留 row 不破坏 playlist/play_history 引用。
@@ -232,6 +377,29 @@ pub fn mark_present(conn: &Connection, ids: &[i64], now_ms: i64) -> AppResult<us
     Ok(updated)
 }
 
+/// 将某个 root 下所有非 missing track 标记为 missing（移除文件夹时用）。
+pub fn mark_missing_by_root(
+    conn: &Connection,
+    root_folder_id: i64,
+    now_ms: i64,
+) -> AppResult<usize> {
+    let n = conn.execute(
+        "UPDATE tracks SET missing_at = ?1, updated_at = ?1
+          WHERE root_folder_id = ?2 AND missing_at IS NULL",
+        params![now_ms, root_folder_id],
+    )?;
+    Ok(n)
+}
+
+/// 解除 track 与 root_folder 的关联（移除文件夹清理时用）。
+pub fn unlink_root(conn: &Connection, root_folder_id: i64) -> AppResult<usize> {
+    let n = conn.execute(
+        "UPDATE tracks SET root_folder_id = NULL WHERE root_folder_id = ?1",
+        [root_folder_id],
+    )?;
+    Ok(n)
+}
+
 /// 用 hash 找已知曲目（用于"文件被移动后保留收藏/播放次数"的身份匹配）。
 pub fn find_by_hash(conn: &Connection, hash: &str) -> AppResult<Vec<Track>> {
     let mut stmt =
@@ -253,6 +421,16 @@ pub fn find_by_path(conn: &Connection, path: &str) -> AppResult<Option<Track>> {
         )
         .optional()?;
     Ok(opt)
+}
+
+/// 用 hash + file_size 精确匹配 track id（用于文件移动检测）。
+pub fn find_ids_by_hash_size(conn: &Connection, hash: &str, size: i64) -> AppResult<Vec<i64>> {
+    let mut stmt = conn.prepare("SELECT id FROM tracks WHERE hash = ?1 AND file_size = ?2")?;
+    let ids: Vec<i64> = stmt
+        .query_map(params![hash, size], |r| r.get(0))?
+        .filter_map(Result::ok)
+        .collect();
+    Ok(ids)
 }
 
 /// 关联 (track_id, artist_id, role)。同 (track_id, role) 已存在时无视。
@@ -311,6 +489,21 @@ pub fn get_view_by_id(conn: &Connection, id: i64) -> AppResult<Option<TrackView>
     Ok(opt)
 }
 
+/// 按 id 获取单首 track（不含 view 联表）。
+pub fn get_by_id(conn: &Connection, id: i64) -> AppResult<Track> {
+    conn.query_row(
+        "SELECT * FROM tracks WHERE id = ?1",
+        params![id],
+        Track::from_row,
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => {
+            crate::error::AppError::NotFound(format!("track {id}"))
+        }
+        other => other.into(),
+    })
+}
+
 pub fn list_by_album(conn: &Connection, album_id: i64) -> AppResult<Vec<TrackView>> {
     let sql = format!(
         "{} ORDER BY t.disc_no NULLS LAST, t.track_no NULLS LAST, t.title COLLATE NOCASE",
@@ -362,6 +555,7 @@ fn base_track_view_select(extra_where: &str) -> String {
                 t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
                 t.is_favorite, t.play_count, t.last_played_at,
                 t.last_seen_at, t.missing_at, t.added_at, t.updated_at,
+                t.root_folder_id,
                 al.name AS album_name,
                 ar.name AS primary_artist_name
          FROM tracks t
@@ -447,6 +641,7 @@ mod tests {
             sample_rate: None,
             channels: None,
             codec: None,
+            root_folder_id: None,
         };
         assert!(insert(&conn, &dup, 100).is_err());
     }
@@ -478,6 +673,7 @@ mod tests {
             sample_rate: Some(44_100),
             channels: Some(2),
             codec: Some("mp3".into()),
+            root_folder_id: None,
         };
         let same_id = update_by_path(&conn, &edited, 9999).unwrap();
         assert_eq!(same_id, id);
@@ -585,6 +781,7 @@ mod tests {
             sample_rate: None,
             channels: None,
             codec: None,
+            root_folder_id: None,
         };
         insert(&conn, &nt2, 100).unwrap();
         let views = list_by_album(&conn, album).unwrap();
@@ -624,5 +821,70 @@ mod tests {
         set_favorite(&conn, id, false, 2000).unwrap();
         let v = get_view_by_id(&conn, id).unwrap().unwrap();
         assert!(!v.track.is_favorite);
+    }
+
+    fn make_basic_artist_album(conn: &rusqlite::Connection) -> (i64, i64) {
+        let now = 1000i64;
+        conn.execute(
+            "INSERT INTO artists (name, added_at, updated_at) VALUES ('A', ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+        let aid = conn.last_insert_rowid();
+        conn.execute(
+            "INSERT INTO albums (name, album_artist_id, added_at, updated_at) VALUES ('Al', ?1, ?2, ?2)",
+            rusqlite::params![aid, now],
+        )
+        .unwrap();
+        let albid = conn.last_insert_rowid();
+        (aid, albid)
+    }
+
+    #[test]
+    fn insert_with_root_folder_round_trips() {
+        let conn = test_db();
+        // First create a scan_folder
+        conn.execute(
+            "INSERT INTO scan_folders (id, path, added_at) VALUES (10, '/m', 0)",
+            [],
+        )
+        .unwrap();
+        let (artist_id, album_id) = make_basic_artist_album(&conn);
+        let nt = NewTrack {
+            file_path: "/m/x.mp3".into(),
+            file_size: 1,
+            file_modified_at: 0,
+            hash: Some("abcdef0123456789".into()),
+            title: "X".into(),
+            album_id: Some(album_id),
+            primary_artist_id: Some(artist_id),
+            album_artist_id: None,
+            track_no: None,
+            disc_no: None,
+            year: None,
+            genre: None,
+            duration_ms: 1000,
+            bitrate: None,
+            sample_rate: None,
+            channels: None,
+            codec: None,
+            root_folder_id: Some(10),
+        };
+        let id = insert(&conn, &nt, 1000).unwrap();
+        let t: Track = conn
+            .query_row(
+                "SELECT t.id, t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
+                    t.album_id, t.primary_artist_id, t.album_artist_id,
+                    t.track_no, t.disc_no, t.year, t.genre,
+                    t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
+                    t.is_favorite, t.play_count, t.last_played_at,
+                    t.last_seen_at, t.missing_at, t.added_at, t.updated_at,
+                    t.root_folder_id
+               FROM tracks t WHERE t.id = ?1",
+                [id],
+                Track::from_row,
+            )
+            .unwrap();
+        assert_eq!(t.root_folder_id, Some(10));
     }
 }

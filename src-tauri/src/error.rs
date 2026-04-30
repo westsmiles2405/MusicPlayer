@@ -26,6 +26,9 @@ pub enum AppError {
     #[error("扫描错误: {0}")]
     Scan(String),
 
+    #[error("扫描已在进行中")]
+    Busy,
+
     #[error("无效输入: {0}")]
     InvalidInput(String),
 
@@ -64,5 +67,12 @@ mod tests {
             }
             other => panic!("expected Database, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn busy_serializes_with_kind_tag() {
+        let err = AppError::Busy;
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains(r#""kind":"Busy""#));
     }
 }

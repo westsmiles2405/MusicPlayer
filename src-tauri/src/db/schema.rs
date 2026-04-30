@@ -11,6 +11,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
         2,
         include_str!("../../migrations/V2__fix_fts5_triggers.sql"),
     ),
+    (3, include_str!("../../migrations/V3__scanner_support.sql")),
 ];
 
 /// 按 schema_migrations 表中的最新版本号增量执行所有未应用迁移。
@@ -123,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn applies_through_v2() {
+    fn applies_through_v3() {
         let conn = Connection::open_in_memory().unwrap();
         apply_pending(&conn).unwrap();
         let v: i64 = conn
@@ -131,7 +132,7 @@ mod tests {
                 r.get(0)
             })
             .unwrap();
-        assert_eq!(v, 2);
+        assert_eq!(v, 3);
     }
 
     #[test]
@@ -161,5 +162,136 @@ mod tests {
             })
             .unwrap();
         assert_eq!(title, "Hello World");
+    }
+
+    #[test]
+    fn applies_v3_and_creates_root_folder_column() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_pending(&conn).unwrap();
+        let v: i64 = conn
+            .query_row("SELECT MAX(version) FROM schema_migrations", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(v, 3, "expected V3 applied, got version={v}");
+
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(tracks)")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(cols.contains(&"root_folder_id".to_string()));
+
+        let idx: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='tracks'")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(idx.iter().any(|n| n == "idx_tracks_hash"));
+        assert!(idx.iter().any(|n| n == "idx_tracks_root_folder"));
+    }
+
+    #[test]
+    fn fts_update_replaces_old_term_after_v3() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_pending(&conn).unwrap();
+        let now = 1000i64;
+        conn.execute(
+            "INSERT INTO artists (id, name, added_at, updated_at) VALUES (1, 'Alpha', ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO albums (id, name, album_artist_id, added_at, updated_at)
+             VALUES (1, 'Album1', 1, ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO tracks (
+                id, file_path, file_size, file_modified_at, title,
+                album_id, primary_artist_id, duration_ms,
+                last_seen_at, added_at, updated_at
+             ) VALUES (1, '/x/a.mp3', 1, 0, 'Song', 1, 1, 1000, ?1, ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+
+        let hits: Vec<i64> = conn
+            .prepare("SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH 'Song'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert_eq!(hits, vec![1]);
+
+        conn.execute(
+            "UPDATE tracks SET title='Renamed', updated_at=?1 WHERE id=1",
+            [now + 1],
+        )
+        .unwrap();
+
+        let old: Vec<i64> = conn
+            .prepare("SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH 'Song'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(old.is_empty(), "old term still searchable after UPDATE");
+
+        let new_hits: Vec<i64> = conn
+            .prepare("SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH 'Renamed'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert_eq!(new_hits, vec![1]);
+    }
+
+    #[test]
+    fn fts_missing_track_excluded_from_search() {
+        let conn = Connection::open_in_memory().unwrap();
+        apply_pending(&conn).unwrap();
+        let now = 1000i64;
+        conn.execute(
+            "INSERT INTO artists (id, name, added_at, updated_at) VALUES (1, 'A', ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO albums (id, name, album_artist_id, added_at, updated_at)
+             VALUES (1, 'Al', 1, ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO tracks (
+                id, file_path, file_size, file_modified_at, title,
+                album_id, primary_artist_id, duration_ms,
+                last_seen_at, added_at, updated_at
+             ) VALUES (1, '/x/y.mp3', 1, 0, 'Hidden', 1, 1, 1000, ?1, ?1, ?1)",
+            [now],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE tracks SET missing_at=?1, updated_at=?1 WHERE id=1",
+            [now + 1],
+        )
+        .unwrap();
+        let hits: Vec<i64> = conn
+            .prepare("SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH 'Hidden'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+        assert!(hits.is_empty(), "missing track still searchable");
     }
 }

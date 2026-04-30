@@ -42,6 +42,11 @@ pub fn upsert_by_name(conn: &Connection, name: &str, now_ms: i64) -> AppResult<i
     Ok(id)
 }
 
+/// 在已有事务中 upsert artist（不打开新事务）。
+pub fn upsert_by_name_in_tx(conn: &Connection, name: &str, now_ms: i64) -> AppResult<i64> {
+    upsert_by_name(conn, name, now_ms)
+}
+
 pub fn get_all(conn: &Connection) -> AppResult<Vec<Artist>> {
     let mut stmt = conn.prepare(
         "SELECT id, name, added_at, updated_at FROM artists ORDER BY name COLLATE NOCASE",

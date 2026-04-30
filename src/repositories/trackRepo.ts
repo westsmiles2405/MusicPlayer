@@ -29,6 +29,7 @@ export interface Track {
   missingAt: number | null;
   addedAt: number;
   updatedAt: number;
+  rootFolderId: number | null;
   albumName: string | null;
   primaryArtistName: string | null;
 }

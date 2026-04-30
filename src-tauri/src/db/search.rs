@@ -21,6 +21,7 @@ pub fn search_tracks(conn: &Connection, query: &str, limit: i64) -> AppResult<Ve
                 t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
                 t.is_favorite, t.play_count, t.last_played_at,
                 t.last_seen_at, t.missing_at, t.added_at, t.updated_at,
+                t.root_folder_id,
                 al.name AS album_name,
                 ar.name AS primary_artist_name
          FROM tracks_fts f
