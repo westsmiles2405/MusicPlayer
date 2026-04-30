@@ -2,8 +2,8 @@
 
 - 创建日期：2026-04-30
 - 项目代号：MusicPlayer
-- 文档状态：Draft v1（已通过 brainstorming 流程，待用户审阅 → writing-plans 出实施计划）
-- 调研依据：`Apple Music 风格音乐播放器分析报告.pdf`（项目根目录）
+- 文档状态：Draft v1.1（已完成首轮审阅修订，待最终确认 → writing-plans 出实施计划）
+- 调研依据：`调研文档/Apple Music 风格音乐播放器分析报告.pdf`
 
 ---
 
@@ -12,7 +12,7 @@
 打造一款**Apple Music 风格的桌面音乐播放器**，目标平台：
 
 - **桌面端 macOS**（首发，目标 Mac App Store 上架）
-- **Web 端**（部署到 GitHub Pages，公开访问）
+- **Web 端 Demo**（部署到 GitHub Pages，公开访问；功能弱于 macOS 原生版）
 - **Windows 桌面端**（v1.x 后增加，非 v1.0 范围）
 
 项目性质：**个人作品集起步 → 演进为公开发布的产品**。GitHub 仓库公开（MIT License）。
@@ -35,6 +35,7 @@
 - ❌ 不做完整流媒体后端（PDF 中的 Kafka / OpenSearch / CDN 体系延后）
 - ❌ 不做移动端原生 App（Phase 3 视情况）
 - ❌ 不做 Touch Bar、桌面歌词浮窗等小众特性
+- ❌ 不要求 Web 端与 macOS 原生版功能完全一致（Phase 1 Web 仅作为作品集 Demo）
 
 ---
 
@@ -62,6 +63,8 @@
 - **I. i18n 框架**（v1.0 仅中文，英文 v1.1 补全）
 - **J. 主题跟随系统**（深色 / 浅色不做手动切换）
 
+其中 Gapless 与 macOS 系统媒体集成属于 v1.0 亮点，但实现风险高。实施计划中需要先安排 spike 验证：若 `symphonia + cpal` 双缓冲、`MPNowPlayingInfoCenter` 桥接或媒体键监听在早期验证不稳定，则降级为 v1.1，不阻塞基础播放器 v1.0 发布。
+
 ### 2.3 推迟到 v1.1+
 
 - 均衡器 EQ、智能播放列表、iTunes XML 导入、音频可视化、桌面歌词浮窗、外部歌词抓取
@@ -88,14 +91,17 @@
 
 ### 3.2 音频与数据
 
-| 关注点 | 选择 |
-|---|---|
-| 解码 / 播放引擎 | **Rust 侧 `symphonia` + `cpal`**（Tauri 命令暴露给前端） |
-| 元数据读取 | **Rust 侧 `lofty`**（ID3 / FLAC Vorbis / MP4 Atom） |
-| 文件系统监听 | Rust 侧 **`notify`** crate |
-| 本地数据库 | **SQLite** via `rusqlite`（WAL 模式） |
-| 全文搜索 | **SQLite FTS5** |
-| 封面取色 | JS 侧 **`extract-colors`** |
+| 关注点 | macOS 原生版 | Web Demo |
+|---|---|---|
+| 解码 / 播放引擎 | **Rust 侧 `symphonia` + `cpal`**（Tauri 命令暴露给前端） | Web Audio API / `<audio>` fallback |
+| 元数据读取 | **Rust 侧 `lofty`**（ID3 / FLAC Vorbis / MP4 Atom） | 浏览器侧轻量解析；必要时只支持基础标签 |
+| 文件系统访问 | Tauri dialog + macOS security-scoped bookmark | File System API（不支持时降级为单文件导入） |
+| 文件系统监听 | Rust 侧 **`notify`** crate | 不做持久监听，用户手动重新导入 |
+| 本地数据库 | **SQLite** via `rusqlite`（WAL 模式） | IndexedDB（仅 Demo 缓存） |
+| 全文搜索 | **SQLite FTS5** | JS 内存搜索 / IndexedDB 索引 |
+| 封面取色 | JS 侧 **`extract-colors`** | 同 macOS 前端实现 |
+
+Phase 1 的产品验收以 macOS 原生版为准。Web Demo 只复用 React UI 与部分 repository 接口，不承诺 Gapless、系统媒体集成、文件夹监听或大曲库性能。
 
 ### 3.3 工程
 
@@ -115,7 +121,7 @@
 
 ### 4.1 顶层架构
 
-单进程双语言：Tauri 2.x 应用 = WebView（前端） + Rust 核心，通过 Tauri IPC（commands + events）通信。
+macOS 原生版是单进程双语言：Tauri 2.x 应用 = WebView（前端） + Rust 核心，通过 Tauri IPC（commands + events）通信。
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -127,7 +133,7 @@
 └─────────────────────────────────────────────────────┘
                                  │
                                  ▼
-                  ~/Library/Application Support/<bundle-id>/
+                  app_data_dir() / Application Support
                     - SQLite db (WAL)
                     - cache/covers/<hash>.jpg
                     - settings
@@ -143,12 +149,12 @@
 
 ### 4.3 关键架构决策
 
-1. **音频流不过 IPC**：解码后 PCM 由 Rust 通过 `cpal` 直接写入系统音频设备；前端只订阅"位置/状态变化"事件。这是 Apple Music 级播放质量的前提，HTML5 `<audio>` 做不到。
+1. **音频流不过 IPC**：macOS 原生版中，解码后 PCM 由 Rust 通过 `cpal` 直接写入系统音频设备；前端只订阅"位置/状态变化"事件。这样可以控制队列、预解码、Gapless 与系统媒体集成。Web Demo 使用浏览器音频能力，体验降级。
 2. **库索引在 Rust 后台线程**：扫描 IO+CPU 双密集，必须后台 worker，前端用进度事件订阅。
 3. **SQLite + WAL**：让"扫描写入"和"前端读取"互不阻塞。
-4. **数据存放**：`~/Library/Application Support/<bundle-id>/`，Mac App Store 沙盒兼容。
+4. **数据存放**：统一通过 Tauri `app_data_dir()` 获取。非沙盒构建通常落在 `~/Library/Application Support/<bundle-id>/`；Mac App Store 沙盒构建落在容器内的 Application Support。
 5. **路由层级浅**：所有页面在主窗口切换；Now Playing 是 overlay（从 Mini Player 上拉），不是单独路由。
-6. **`repositories/` 解耦层**：Phase 1 调 Tauri 命令，Phase 2 改调 HTTP API，UI 代码不变。
+6. **`repositories/` 解耦层**：UI 只依赖 repository 接口。macOS adapter 调 Tauri 命令；Web Demo adapter 调浏览器 API；Phase 2 可切到 HTTP API。
 
 ---
 
@@ -215,17 +221,19 @@ src-tauri/src/
 CREATE TABLE artists (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  added_at INTEGER NOT NULL
+  added_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
 );
 
 -- 专辑
 CREATE TABLE albums (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
-  album_artist_id INTEGER REFERENCES artists(id),
+  album_artist_id INTEGER NOT NULL REFERENCES artists(id),
   year INTEGER,
   cover_path TEXT,
   added_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
   UNIQUE(name, album_artist_id)
 );
 
@@ -238,7 +246,7 @@ CREATE TABLE tracks (
   hash TEXT,                              -- xxhash 首尾 64KB
   title TEXT NOT NULL,
   album_id INTEGER REFERENCES albums(id),
-  artist_id INTEGER REFERENCES artists(id),
+  primary_artist_id INTEGER REFERENCES artists(id),
   album_artist_id INTEGER REFERENCES artists(id),
   track_no INTEGER,
   disc_no INTEGER,
@@ -252,12 +260,15 @@ CREATE TABLE tracks (
   is_favorite INTEGER NOT NULL DEFAULT 0,
   play_count INTEGER NOT NULL DEFAULT 0,
   last_played_at INTEGER,
+  last_seen_at INTEGER NOT NULL,           -- 最近一次扫描仍然存在
+  missing_at INTEGER,                      -- 文件缺失时软删除，不破坏播放列表/历史
   added_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX idx_tracks_album ON tracks(album_id);
-CREATE INDEX idx_tracks_artist ON tracks(artist_id);
+CREATE INDEX idx_tracks_primary_artist ON tracks(primary_artist_id);
 CREATE INDEX idx_tracks_title ON tracks(title);
+CREATE INDEX idx_tracks_missing ON tracks(missing_at);
 
 -- 曲目-艺人多对多（含 role：main / featured / composer 等）
 CREATE TABLE track_artists (
@@ -301,6 +312,7 @@ CREATE INDEX idx_play_history_played_at ON play_history(played_at DESC);
 CREATE TABLE scan_folders (
   id INTEGER PRIMARY KEY,
   path TEXT NOT NULL UNIQUE,
+  bookmark_data BLOB,                     -- macOS 沙盒持久访问用 security-scoped bookmark
   added_at INTEGER NOT NULL,
   last_scanned_at INTEGER
 );
@@ -313,10 +325,26 @@ CREATE TABLE app_state (
 );
 
 -- 全文搜索
+CREATE VIEW tracks_search_view AS
+SELECT
+  tracks.id AS id,
+  tracks.title AS title,
+  albums.name AS album_name,
+  artists.name AS artist_name
+FROM tracks
+LEFT JOIN albums ON albums.id = tracks.album_id
+LEFT JOIN artists ON artists.id = tracks.primary_artist_id
+WHERE tracks.missing_at IS NULL;
+
 CREATE VIRTUAL TABLE tracks_fts USING fts5(
   title, album_name, artist_name,
+  content='tracks_search_view',
+  content_rowid='id',
   tokenize='unicode61 remove_diacritics 2'
 );
+
+-- 迁移时建立 tracks / albums / artists 相关 triggers 保持 tracks_fts 与 tracks_search_view 一致；
+-- 大规模扫描或批量元数据修正后可执行 INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild') 重建索引。
 
 -- 迁移记录
 CREATE TABLE schema_migrations (
@@ -328,8 +356,10 @@ CREATE TABLE schema_migrations (
 ### 6.2 关键约束
 
 - `tracks.file_path` UNIQUE：业务主键
-- `(albums.name, album_artist_id)` UNIQUE：去重规则
+- `(albums.name, album_artist_id)` UNIQUE：去重规则；缺失专辑艺人统一指向内置 `Unknown Artist`，避免 SQLite 中 `NULL` 破坏唯一性
 - `tracks.hash`：用于文件被移动 / 重命名时识别同一首歌，保留收藏与播放次数
+- `tracks.missing_at`：文件消失时软删除；播放列表、收藏、播放历史不被级联破坏
+- `tracks.primary_artist_id`：主艺人缓存字段，用于列表/搜索排序；完整艺人关系以 `track_artists` 为准
 - `play_history.completed`：>= 95% 时长视为听完，决定 `play_count` 累加
 
 ### 6.3 迁移策略
@@ -343,10 +373,10 @@ CREATE TABLE schema_migrations (
 ### 7.1 添加音乐文件夹
 
 1. 前端调 `add_folder(path)`
-2. Rust 写 `scan_folders` 表，起后台扫描任务
+2. Rust 写 `scan_folders` 表；macOS 沙盒构建同时保存 security-scoped bookmark，起后台扫描任务
 3. 每解析 50 首 emit `scan_progress` 事件 → 前端进度条
 4. 解析完写 `tracks/albums/artists/track_artists`，提取嵌入封面到 `cache/covers/<hash>.jpg`
-5. 全部完成 emit `scan_done` → 前端 TanStack Query 失效缓存 → UI 刷新
+5. 扫描完成后更新 `tracks_fts`（增量 triggers 或 rebuild）并 emit `scan_done` → 前端 TanStack Query 失效缓存 → UI 刷新
 
 ### 7.2 播放一首歌
 
@@ -359,13 +389,13 @@ CREATE TABLE schema_migrations (
 ### 7.3 文件夹监听（增量更新）
 
 1. notify crate 检测到变化 → 防抖 2 秒
-2. 对比 `file_path + hash + mtime`：新文件 INSERT / 修改 UPDATE / 删除标记 deleted
+2. 对比 `file_path + hash + mtime`：新文件 INSERT / 修改 UPDATE / 消失文件设置 `missing_at`
 3. emit `library_changed` → 前端刷新
 
 ### 7.4 搜索
 
 1. 输入框 debounce 200ms → `search(query)`
-2. Rust 查 `tracks_fts`，返回 top 50（按相关度）
+2. Rust 查 `tracks_fts`，只返回 `missing_at IS NULL` 的曲目 top 50（按相关度）
 3. 前端按"歌曲 / 专辑 / 艺人"分组渲染
 
 ---
@@ -441,12 +471,22 @@ CREATE TABLE schema_migrations (
 
 ### 12.2 `release.yml`（tag 触发）
 
-- `tauri build --target universal-apple-darwin`（Intel + ARM 通用包）
-- 产出 .dmg + .app.tar.gz + .sig
-- Web：vite build → 部署到 gh-pages 分支
-- 创建 GitHub Release（draft），上传产物
-- Mac App Store：单独走 fastlane（手动触发，Phase 1 末期再加）
-- 代码签名 + Notarization 凭证存 GitHub Secrets
+Phase 1 发布拆成三条路径，避免把 App Store、直接分发和 Web Demo 混在同一个 job：
+
+1. **直接下载版（Developer ID）**
+   - `tauri build --target universal-apple-darwin`（Intel + ARM 通用包）
+   - 产出 `.dmg` + `.app.tar.gz` + `.sig`
+   - 使用 Developer ID Application 证书签名并 notarize
+   - 创建 GitHub Release（draft），上传产物
+
+2. **Mac App Store 版（Apple Distribution）**
+   - Phase 1 末期再接入，手动触发
+   - 独立 entitlements：App Sandbox、User Selected Files / Music Folder、security-scoped bookmarks
+   - 可用 fastlane 或 Xcode 工具链上传 App Store Connect
+
+3. **Web Demo**
+   - `vite build` → 部署到 GitHub Pages / `gh-pages` 分支
+   - 明确标注为 Demo，不展示原生版不可用的功能入口
 
 ---
 
@@ -470,21 +510,23 @@ CREATE TABLE schema_migrations (
 | 风险 | 描述 | 缓解 |
 |---|---|---|
 | Mac App Store 沙盒 | 沙盒下需要用 NSOpenPanel 取得文件夹权限，之后用 security-scoped bookmark 持久化 | 在文件选择对话框层处理；写在 Rust 侧 macOS-specific 模块 |
-| 代码签名 / 公证 | 需要 Apple Developer 账号（$99/年） | Phase 1 末期用户自行注册；CI 用 Secrets |
+| 代码签名 / 公证 / App Store | 直接分发与 Mac App Store 使用不同证书、entitlements 与上传流程 | release job 拆分为 Developer ID、Mac App Store、Web Demo 三条路径 |
 | Tauri 媒体 API 成熟度 | macOS Now Playing 系统集成需 objc 桥接，社区 crate 不一定齐全 | 必要时手写 FFI（`objc2` crate） |
 | FLAC / ALAC 解码兼容性 | symphonia 对部分 FLAC 变体可能不支持 | 手测覆盖常见编码组合，问题 fallback 用 ffmpeg-rs（Phase 1.x） |
-| Web 端音频能力 | Web 端不能用 cpal，只能用 Web Audio API | Web 端代码中保留 fallback 路径，体验弱化但能听 |
+| FTS5 一致性 | tracks 与 FTS 索引可能因扫描/删除不同步 | 使用 external content + triggers；大规模扫描后支持 rebuild |
+| Web 端文件与音频能力 | Web 端不能用 cpal、notify、SQLite，浏览器文件夹能力也有兼容差异 | Web Demo 独立 adapter，隐藏不支持的功能入口，必要时降级为单文件导入 |
 | Tauri 2.x 文档 / 生态 | 2.x 仍在快速迭代 | 锁版本，关注 changelog；CI 矩阵不上 nightly |
 
 ---
 
 ## 15. 后续步骤
 
-1. ✅ 设计文档定稿（本文件）
-2. ✅ 用户审阅
-3. ⏭️ 调用 `superpowers:writing-plans` 出可执行的分阶段实施计划
-4. ⏭️ 按 plan 进入 `executing-plans` / `subagent-driven-development`
+1. ✅ 设计文档首版完成
+2. ✅ 首轮审阅修订（Web 边界、发布链路、SQLite/FTS、软删除）
+3. ⏭️ 用户最终确认
+4. ⏭️ 调用 `superpowers:writing-plans` 出可执行的分阶段实施计划
+5. ⏭️ 按 plan 进入 `executing-plans` / `subagent-driven-development`
 
 ---
 
-_本设计基于项目根目录 `Apple Music 风格音乐播放器分析报告.pdf` 调研，核心技术选型在调研建议基础上根据"桌面优先 + 个人作品集起步"做了调整：移动端 Flutter 推迟至 Phase 3，桌面采用 Tauri + React 单代码两端策略。_
+_本设计基于 `调研文档/Apple Music 风格音乐播放器分析报告.pdf` 调研，核心技术选型在调研建议基础上根据"桌面优先 + 个人作品集起步"做了调整：移动端 Flutter 推迟至 Phase 3，桌面采用 Tauri + React，并通过 repository adapter 区分 macOS 原生版与 Web Demo。_
