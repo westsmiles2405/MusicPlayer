@@ -97,6 +97,8 @@ MusicPlayer/
 4. **数据存放**：`~/Library/Application Support/<bundle-id>/`（用 Tauri `app_data_dir()`），Mac App Store 沙盒兼容。
 5. **`tracks.file_path` 是业务主键，`tracks.hash` 用于文件移动后的身份保留**。
 6. **错误分三档**：轻微（log）/ 中等（toast）/ 严重（模态阻塞）。统一从 `src-tauri/src/error.rs::AppError` 流到前端 ErrorBoundary。
+7. **i18next 必须在 `src/main.tsx` 顶部 side-effect import**（`import "@/i18n";`），否则被 Vite tree-shake，`useTranslation()` 拿不到资源。
+8. **Rust 子模块必须在父 `mod.rs` 里 `pub mod` 显式声明**（`commands/mod.rs` / `db/mod.rs`），否则 `tauri::generate_handler!` 找不到目标。
 
 ## 6. 工程规范
 
@@ -109,6 +111,7 @@ MusicPlayer/
 | 代码注释 | 只写"为什么"。不写"做什么"——代码本身已经说明了 |
 | TS | strict；函数式组件 + 自定义 hooks 优先 |
 | Rust | 按领域切模块（不要"utils.rs"大杂烩）；用 `thiserror` 定义错误 |
+| TS 配置 | **不用** project references — 单 `tsconfig.json` 即可，`tsconfig.node.json` 只给 vite.config.ts 类型用 |
 | 文档 / Issue / PR / 注释语言 | 中文为主。README、ISSUE_TEMPLATE 双语 |
 
 ## 7. v1.0 必做功能（不要走偏）
@@ -145,12 +148,15 @@ pnpm lint                    # ESLint + Prettier --check
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
+# 前端独立验证（不跑 Rust，秒级）
+pnpm build                   # tsc + vite build；只想验前端配置/类型时用这个
+
 # 出包
 pnpm tauri build             # 本地出 DMG
 pnpm tauri build --target universal-apple-darwin   # Intel + ARM 通用
 ```
 
-> 项目脚手架尚未生成，以上命令在 v0.1.0 完成后启用。
+> **已知现象**：未配置代码签名时 `pnpm tauri build` 的 DMG 步骤会失败但 `.app` 已生成 — 是预期，不是 bug。
 
 ## 9. 关键风险（开发时留意）
 

@@ -46,6 +46,11 @@ test-results/
 *.tar.gz
 release/
 
+# Claude / Agent context (auto-generated, session-specific)
+AGENTS.md
+Claude历史记录/
+调研文档/
+
 # Apple signing (NEVER commit)
 *.p12
 *.cer
