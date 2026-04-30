@@ -1,0 +1,18 @@
+{
+  "app": {
+    "name": "MusicPlayer"
+  },
+  "sidebar": {
+    "library": "资料库",
+    "recentlyAdded": "最近添加",
+    "artists": "艺人",
+    "albums": "专辑",
+    "songs": "歌曲"
+  },
+  "player": {
+    "play": "播放",
+    "pause": "暂停",
+    "next": "下一首",
+    "previous": "上一首"
+  }
+}
