@@ -9,13 +9,21 @@ function Nav() {
     <nav className="flex gap-4 px-8 py-3 text-sm border-b border-white/10 bg-black/60 backdrop-blur-md">
       <Link
         to="/"
-        className={pathname === "/" ? "text-white font-medium" : "text-white/60 hover:text-white"}
+        className={
+          pathname === "/"
+            ? "text-white font-medium"
+            : "text-white/60 hover:text-white"
+        }
       >
         资料库
       </Link>
       <Link
         to="/settings"
-        className={pathname === "/settings" ? "text-white font-medium" : "text-white/60 hover:text-white"}
+        className={
+          pathname === "/settings"
+            ? "text-white font-medium"
+            : "text-white/60 hover:text-white"
+        }
       >
         设置
       </Link>
