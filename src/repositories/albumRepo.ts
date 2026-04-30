@@ -1,12 +1,17 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export interface Album {
   id: number;
   name: string;
-  artistName: string;
-  year?: number;
-  coverPath?: string;
+  albumArtistId: number;
+  year: number | null;
+  coverPath: string | null;
+  addedAt: number;
+  updatedAt: number;
+  albumArtistName: string;
+  trackCount: number;
 }
 
-export async function getAlbums(): Promise<Album[]> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<Album[]>("get_albums");
-}
+export const albumRepo = {
+  list: () => invoke<Album[]>("get_albums"),
+};

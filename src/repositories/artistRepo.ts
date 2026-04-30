@@ -1,9 +1,12 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export interface Artist {
   id: number;
   name: string;
+  addedAt: number;
+  updatedAt: number;
 }
 
-export async function getArtists(): Promise<Artist[]> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<Artist[]>("get_artists");
-}
+export const artistRepo = {
+  list: () => invoke<Artist[]>("get_artists"),
+};
