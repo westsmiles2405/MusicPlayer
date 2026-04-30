@@ -46,6 +46,9 @@ test-results/
 *.tar.gz
 release/
 
+# Git worktrees
+.worktrees/
+
 # Claude / Agent context (auto-generated, session-specific)
 AGENTS.md
 Claude历史记录/
