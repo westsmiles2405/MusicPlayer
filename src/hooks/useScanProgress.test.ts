@@ -39,9 +39,13 @@ describe("useScanProgress", () => {
 
   it("transitions idle -> scanning -> done", async () => {
     const { result } = renderHook(() => useScanProgress());
-    await waitFor(() => expect(listeners.scan_progress?.length ?? 0).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(listeners.scan_progress?.length ?? 0).toBeGreaterThan(0),
+    );
 
-    act(() => fire("scan_progress", { done: 1, total: 5, currentFile: "a.mp3" }));
+    act(() =>
+      fire("scan_progress", { done: 1, total: 5, currentFile: "a.mp3" }),
+    );
     expect(result.current.phase).toBe("scanning");
     expect(result.current.progress?.done).toBe(1);
 

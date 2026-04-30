@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { libraryRepo, type ScanProgress, type ScanReport } from "@/repositories/libraryRepo";
+import {
+  libraryRepo,
+  type ScanProgress,
+  type ScanReport,
+} from "@/repositories/libraryRepo";
 
 export type ScanPhase = "idle" | "scanning" | "done";
 
