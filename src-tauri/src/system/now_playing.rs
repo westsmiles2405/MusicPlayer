@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! macOS Now Playing integration
 //! Bridges to MPNowPlayingInfoCenter + MPRemoteCommandCenter
 //! Enables media keys, Control Center, AirPods auto-pause

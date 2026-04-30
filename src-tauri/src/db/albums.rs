@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 //! Album queries.
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
@@ -40,7 +41,13 @@ impl Album {
     }
 }
 
-pub fn upsert(conn: &Connection, name: &str, album_artist_id: i64, year: Option<i32>, now_ms: i64) -> AppResult<i64> {
+pub fn upsert(
+    conn: &Connection,
+    name: &str,
+    album_artist_id: i64,
+    year: Option<i32>,
+    now_ms: i64,
+) -> AppResult<i64> {
     conn.execute(
         "INSERT OR IGNORE INTO albums (name, album_artist_id, year, added_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?4)",
@@ -71,7 +78,9 @@ pub fn get_all(conn: &Connection) -> AppResult<Vec<AlbumView>> {
         })
     })?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 
@@ -125,8 +134,14 @@ mod tests {
         let alb1 = upsert(&conn, "Greatest Hits", a1, Some(1970), 100).unwrap();
         let alb2 = upsert(&conn, "Greatest Hits", a2, Some(1971), 100).unwrap();
         let alb3 = upsert(&conn, "Greatest Hits", a1, Some(1970), 200).unwrap();
-        assert_ne!(alb1, alb2, "same name different artist must produce different albums");
-        assert_eq!(alb1, alb3, "second call with same (name, artist) must return existing id");
+        assert_ne!(
+            alb1, alb2,
+            "same name different artist must produce different albums"
+        );
+        assert_eq!(
+            alb1, alb3,
+            "second call with same (name, artist) must return existing id"
+        );
     }
 
     #[test]
@@ -153,6 +168,9 @@ mod tests {
         let alb = upsert(&conn, "Abbey Road", a, Some(1969), 100).unwrap();
         set_cover_path(&conn, alb, "/cache/covers/abc.jpg", 200).unwrap();
         let fetched = get_by_id(&conn, alb).unwrap().unwrap();
-        assert_eq!(fetched.album.cover_path.as_deref(), Some("/cache/covers/abc.jpg"));
+        assert_eq!(
+            fetched.album.cover_path.as_deref(),
+            Some("/cache/covers/abc.jpg")
+        );
     }
 }

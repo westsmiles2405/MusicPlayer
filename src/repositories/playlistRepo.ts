@@ -13,12 +13,17 @@ export interface Playlist {
 
 export const playlistRepo = {
   list: () => invoke<Playlist[]>("get_playlists"),
-  tracks: (playlistId: number) => invoke<Track[]>("get_playlist_tracks", { playlistId }),
+  tracks: (playlistId: number) =>
+    invoke<Track[]>("get_playlist_tracks", { playlistId }),
   create: (name: string, description?: string) =>
-    invoke<number>("create_playlist", { name, description: description ?? null }),
+    invoke<number>("create_playlist", {
+      name,
+      description: description ?? null,
+    }),
   rename: (playlistId: number, name: string) =>
     invoke<void>("rename_playlist", { playlistId, name }),
-  delete: (playlistId: number) => invoke<void>("delete_playlist", { playlistId }),
+  delete: (playlistId: number) =>
+    invoke<void>("delete_playlist", { playlistId }),
   addTrack: (playlistId: number, trackId: number) =>
     invoke<number>("add_to_playlist", { playlistId, trackId }),
   removeTrack: (playlistId: number, trackId: number, position: number) =>

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Cover art extractor + cache manager
 //! Extracts embedded covers to cache/covers/<hash>.jpg
 

@@ -19,7 +19,13 @@ pub struct PlayHistoryEntry {
 }
 
 /// 写一次播放事件。当 completed=true 时同时累加 tracks.play_count 并更新 last_played_at。
-pub fn record(conn: &Connection, track_id: i64, played_at_ms: i64, duration_played_ms: i64, completed: bool) -> AppResult<i64> {
+pub fn record(
+    conn: &Connection,
+    track_id: i64,
+    played_at_ms: i64,
+    duration_played_ms: i64,
+    completed: bool,
+) -> AppResult<i64> {
     let tx = conn.unchecked_transaction()?;
     tx.execute(
         "INSERT INTO play_history (track_id, played_at, duration_played_ms, completed) VALUES (?1, ?2, ?3, ?4)",
@@ -56,7 +62,9 @@ pub fn get_recent(conn: &Connection, limit: i64) -> AppResult<Vec<PlayHistoryEnt
     )?;
     let rows = stmt.query_map(params![limit], from_row)?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 
@@ -83,10 +91,22 @@ mod tests {
         let conn = test_db();
         let id = testing::make_basic_track(&conn, "Song");
         record(&conn, id, 1000, 240_000, true).unwrap();
-        let count: i64 = conn.query_row("SELECT play_count FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT play_count FROM tracks WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
         record(&conn, id, 2000, 240_000, true).unwrap();
-        let count: i64 = conn.query_row("SELECT play_count FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT play_count FROM tracks WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 2);
     }
 
@@ -95,8 +115,20 @@ mod tests {
         let conn = test_db();
         let id = testing::make_basic_track(&conn, "Song");
         record(&conn, id, 1500, 30_000, false).unwrap();
-        let count: i64 = conn.query_row("SELECT play_count FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
-        let last: i64 = conn.query_row("SELECT last_played_at FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT play_count FROM tracks WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let last: i64 = conn
+            .query_row(
+                "SELECT last_played_at FROM tracks WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 0);
         assert_eq!(last, 1500);
     }

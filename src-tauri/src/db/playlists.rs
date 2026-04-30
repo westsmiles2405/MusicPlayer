@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 //! Playlist queries.
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
@@ -37,7 +38,12 @@ impl Playlist {
     }
 }
 
-pub fn create(conn: &Connection, name: &str, description: Option<&str>, now_ms: i64) -> AppResult<i64> {
+pub fn create(
+    conn: &Connection,
+    name: &str,
+    description: Option<&str>,
+    now_ms: i64,
+) -> AppResult<i64> {
     conn.execute(
         "INSERT INTO playlists (name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?3)",
         params![name, description, now_ms],
@@ -78,11 +84,16 @@ pub fn list(conn: &Connection) -> AppResult<Vec<PlaylistSummary>> {
         })
     })?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 
-pub fn get_tracks(conn: &Connection, playlist_id: i64) -> AppResult<Vec<crate::db::tracks::TrackView>> {
+pub fn get_tracks(
+    conn: &Connection,
+    playlist_id: i64,
+) -> AppResult<Vec<crate::db::tracks::TrackView>> {
     use crate::db::tracks::{Track, TrackView};
     let mut stmt = conn.prepare(
         "SELECT t.id, t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
@@ -108,11 +119,18 @@ pub fn get_tracks(conn: &Connection, playlist_id: i64) -> AppResult<Vec<crate::d
         })
     })?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 
-pub fn append_track(conn: &Connection, playlist_id: i64, track_id: i64, now_ms: i64) -> AppResult<i64> {
+pub fn append_track(
+    conn: &Connection,
+    playlist_id: i64,
+    track_id: i64,
+    now_ms: i64,
+) -> AppResult<i64> {
     let next_pos: i64 = conn.query_row(
         "SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_tracks WHERE playlist_id = ?1",
         params![playlist_id],
@@ -125,7 +143,12 @@ pub fn append_track(conn: &Connection, playlist_id: i64, track_id: i64, now_ms: 
     Ok(next_pos)
 }
 
-pub fn remove_track(conn: &Connection, playlist_id: i64, track_id: i64, position: i64) -> AppResult<()> {
+pub fn remove_track(
+    conn: &Connection,
+    playlist_id: i64,
+    track_id: i64,
+    position: i64,
+) -> AppResult<()> {
     let n = conn.execute(
         "DELETE FROM playlist_tracks WHERE playlist_id = ?1 AND track_id = ?2 AND position = ?3",
         params![playlist_id, track_id, position],
@@ -138,7 +161,12 @@ pub fn remove_track(conn: &Connection, playlist_id: i64, track_id: i64, position
     Ok(())
 }
 
-pub fn reorder(conn: &Connection, playlist_id: i64, from_position: i64, to_position: i64) -> AppResult<()> {
+pub fn reorder(
+    conn: &Connection,
+    playlist_id: i64,
+    from_position: i64,
+    to_position: i64,
+) -> AppResult<()> {
     if from_position == to_position {
         return Ok(());
     }
@@ -152,7 +180,9 @@ pub fn reorder(conn: &Connection, playlist_id: i64, from_position: i64, to_posit
             |r| r.get(0),
         )
         .map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => crate::error::AppError::NotFound(format!("playlist {playlist_id} pos {from_position}")),
+            rusqlite::Error::QueryReturnedNoRows => crate::error::AppError::NotFound(format!(
+                "playlist {playlist_id} pos {from_position}"
+            )),
             other => other.into(),
         })?;
 
@@ -196,14 +226,30 @@ mod tests {
         let pid = create(conn, "Mix", None, 100).unwrap();
         let t1 = testing::make_basic_track(conn, "T1");
         // T2/T3 必须复用 TestArtist 否则 file_path 冲突；改 path
-        let artist = crate::db::artists::find_by_name(conn, "TestArtist").unwrap().unwrap().id;
+        let artist = crate::db::artists::find_by_name(conn, "TestArtist")
+            .unwrap()
+            .unwrap()
+            .id;
         let album = crate::db::albums::upsert(conn, "TestAlbum", artist, Some(2024), 100).unwrap();
         let mk = |path: &str, title: &str| -> i64 {
             let nt = crate::db::tracks::NewTrack {
-                file_path: path.into(), file_size: 1, file_modified_at: 0, hash: None, title: title.into(),
-                album_id: Some(album), primary_artist_id: Some(artist), album_artist_id: Some(artist),
-                track_no: None, disc_no: None, year: None, genre: None,
-                duration_ms: 0, bitrate: None, sample_rate: None, channels: None, codec: None,
+                file_path: path.into(),
+                file_size: 1,
+                file_modified_at: 0,
+                hash: None,
+                title: title.into(),
+                album_id: Some(album),
+                primary_artist_id: Some(artist),
+                album_artist_id: Some(artist),
+                track_no: None,
+                disc_no: None,
+                year: None,
+                genre: None,
+                duration_ms: 0,
+                bitrate: None,
+                sample_rate: None,
+                channels: None,
+                codec: None,
             };
             crate::db::tracks::insert(conn, &nt, 100).unwrap()
         };
@@ -230,9 +276,13 @@ mod tests {
     fn append_track_increments_position() {
         let conn = test_db();
         let (pid, ids) = setup_with_three_tracks(&conn);
-        let positions: Vec<i64> = conn.prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position").unwrap()
-            .query_map(params![pid], |r| r.get(0)).unwrap()
-            .map(|r| r.unwrap()).collect();
+        let positions: Vec<i64> = conn
+            .prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position")
+            .unwrap()
+            .query_map(params![pid], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
         assert_eq!(positions, vec![0, 1, 2]);
         // get_tracks 返回顺序也是 0,1,2
         let views = get_tracks(&conn, pid).unwrap();
@@ -249,9 +299,13 @@ mod tests {
         assert_eq!(views.len(), 2);
         // remaining tracks keep their (now possibly non-contiguous) positions: 0, 2
         // 实现允许"洞"或"压实"二选一 — 此项目选保留洞，append 时按 MAX(position)+1
-        let pos_after: Vec<i64> = conn.prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position").unwrap()
-            .query_map(params![pid], |r| r.get(0)).unwrap()
-            .map(|r| r.unwrap()).collect();
+        let pos_after: Vec<i64> = conn
+            .prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position")
+            .unwrap()
+            .query_map(params![pid], |r| r.get(0))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
         assert_eq!(pos_after, vec![0, 2]);
     }
 
@@ -265,8 +319,13 @@ mod tests {
         let titles: Vec<&str> = views.iter().map(|v| v.track.title.as_str()).collect();
         assert_eq!(titles, vec!["T2", "T3", "T1"]);
         // 反过来：T1 移回首位
-        let new_t1_pos = conn.query_row("SELECT position FROM playlist_tracks WHERE playlist_id=?1 AND track_id=?2",
-            params![pid, ids[0]], |r| r.get::<_, i64>(0)).unwrap();
+        let new_t1_pos = conn
+            .query_row(
+                "SELECT position FROM playlist_tracks WHERE playlist_id=?1 AND track_id=?2",
+                params![pid, ids[0]],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap();
         reorder(&conn, pid, new_t1_pos, 0).unwrap();
         let views = get_tracks(&conn, pid).unwrap();
         let titles: Vec<&str> = views.iter().map(|v| v.track.title.as_str()).collect();
@@ -278,7 +337,13 @@ mod tests {
         let conn = test_db();
         let (pid, _) = setup_with_three_tracks(&conn);
         delete(&conn, pid).unwrap();
-        let n: i64 = conn.query_row("SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id=?1", params![pid], |r| r.get(0)).unwrap();
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id=?1",
+                params![pid],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(n, 0);
     }
 
@@ -287,7 +352,13 @@ mod tests {
         let conn = test_db();
         let pid = create(&conn, "Old", None, 100).unwrap();
         rename(&conn, pid, "New", 200).unwrap();
-        let n: String = conn.query_row("SELECT name FROM playlists WHERE id=?1", params![pid], |r| r.get(0)).unwrap();
+        let n: String = conn
+            .query_row(
+                "SELECT name FROM playlists WHERE id=?1",
+                params![pid],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(n, "New");
     }
 }

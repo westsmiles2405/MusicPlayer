@@ -39,7 +39,9 @@ pub fn search_tracks(conn: &Connection, query: &str, limit: i64) -> AppResult<Ve
         })
     })?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 
@@ -119,6 +121,6 @@ mod tests {
     fn build_fts_query_escapes_internal_quotes() {
         let q = build_fts_query(r#"hello "world""#);
         assert!(q.contains(r#""hello"*"#));
-        assert!(q.contains(r#""""world"""*"#));  // 双引号被转义
+        assert!(q.contains(r#""""world"""*"#)); // 双引号被转义
     }
 }

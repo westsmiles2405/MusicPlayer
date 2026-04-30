@@ -12,5 +12,6 @@ export interface PlayHistoryEntry {
 }
 
 export const historyRepo = {
-  recent: (limit = 50) => invoke<PlayHistoryEntry[]>("get_recent_plays", { limit }),
+  recent: (limit = 50) =>
+    invoke<PlayHistoryEntry[]>("get_recent_plays", { limit }),
 };

@@ -17,17 +17,31 @@ pub struct ListParams {
     pub offset: i64,
 }
 
-fn default_sort() -> tracks::TrackSort { tracks::TrackSort::Title }
-fn default_limit() -> i64 { 500 }
+fn default_sort() -> tracks::TrackSort {
+    tracks::TrackSort::Title
+}
+fn default_limit() -> i64 {
+    500
+}
 
 fn now_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 #[tauri::command]
-pub async fn get_tracks(db: State<'_, Database>, params: Option<ListParams>) -> AppResult<Vec<tracks::TrackView>> {
-    let p = params.unwrap_or(ListParams { sort: default_sort(), limit: default_limit(), offset: 0 });
+pub async fn get_tracks(
+    db: State<'_, Database>,
+    params: Option<ListParams>,
+) -> AppResult<Vec<tracks::TrackView>> {
+    let p = params.unwrap_or(ListParams {
+        sort: default_sort(),
+        limit: default_limit(),
+        offset: 0,
+    });
     db.with_conn(|c| tracks::list(c, p.sort, p.limit, p.offset))
 }
 
@@ -42,22 +56,34 @@ pub async fn get_artists(db: State<'_, Database>) -> AppResult<Vec<artists::Arti
 }
 
 #[tauri::command]
-pub async fn get_album_tracks(db: State<'_, Database>, album_id: i64) -> AppResult<Vec<tracks::TrackView>> {
+pub async fn get_album_tracks(
+    db: State<'_, Database>,
+    album_id: i64,
+) -> AppResult<Vec<tracks::TrackView>> {
     db.with_conn(|c| tracks::list_by_album(c, album_id))
 }
 
 #[tauri::command]
-pub async fn get_artist_tracks(db: State<'_, Database>, artist_id: i64) -> AppResult<Vec<tracks::TrackView>> {
+pub async fn get_artist_tracks(
+    db: State<'_, Database>,
+    artist_id: i64,
+) -> AppResult<Vec<tracks::TrackView>> {
     db.with_conn(|c| tracks::list_by_artist(c, artist_id))
 }
 
 #[tauri::command]
-pub async fn get_recently_added(db: State<'_, Database>, limit: Option<i64>) -> AppResult<Vec<tracks::TrackView>> {
+pub async fn get_recently_added(
+    db: State<'_, Database>,
+    limit: Option<i64>,
+) -> AppResult<Vec<tracks::TrackView>> {
     db.with_conn(|c| tracks::recently_added(c, limit.unwrap_or(50)))
 }
 
 #[tauri::command]
-pub async fn get_recent_plays(db: State<'_, Database>, limit: Option<i64>) -> AppResult<Vec<play_history::PlayHistoryEntry>> {
+pub async fn get_recent_plays(
+    db: State<'_, Database>,
+    limit: Option<i64>,
+) -> AppResult<Vec<play_history::PlayHistoryEntry>> {
     db.with_conn(|c| play_history::get_recent(c, limit.unwrap_or(50)))
 }
 
@@ -67,12 +93,21 @@ pub async fn set_favorite(db: State<'_, Database>, track_id: i64, favorite: bool
 }
 
 #[tauri::command]
-pub async fn record_play(db: State<'_, Database>, track_id: i64, duration_played_ms: i64, completed: bool) -> AppResult<i64> {
+pub async fn record_play(
+    db: State<'_, Database>,
+    track_id: i64,
+    duration_played_ms: i64,
+    completed: bool,
+) -> AppResult<i64> {
     db.with_conn(|c| play_history::record(c, track_id, now_ms(), duration_played_ms, completed))
 }
 
 #[tauri::command]
-pub async fn search(db: State<'_, Database>, query: String, limit: Option<i64>) -> AppResult<Vec<tracks::TrackView>> {
+pub async fn search(
+    db: State<'_, Database>,
+    query: String,
+    limit: Option<i64>,
+) -> AppResult<Vec<tracks::TrackView>> {
     db.with_conn(|c| search::search_tracks(c, &query, limit.unwrap_or(50)))
 }
 
@@ -87,7 +122,7 @@ pub async fn add_folder(db: State<'_, Database>, path: String) -> AppResult<()> 
         )?;
         Ok(())
     })?;
-    let _ = playlists::list;  // 抑制未使用警告
+    let _ = playlists::list; // 抑制未使用警告
     let _ = AppError::NotFound("".into());
     Ok(())
 }

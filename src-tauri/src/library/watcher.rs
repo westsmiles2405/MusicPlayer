@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Filesystem watcher using notify crate
 //! Detects new/modified/deleted files with 2s debounce
 

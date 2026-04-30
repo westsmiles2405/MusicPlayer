@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Gapless playback: double-buffered decoding
 //! Pre-decodes next track while current is still playing
 

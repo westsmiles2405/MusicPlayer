@@ -41,9 +41,12 @@ export interface ListParams {
 
 export const trackRepo = {
   list: (params?: ListParams) => invoke<Track[]>("get_tracks", { params }),
-  byAlbum: (albumId: number) => invoke<Track[]>("get_album_tracks", { albumId }),
-  byArtist: (artistId: number) => invoke<Track[]>("get_artist_tracks", { artistId }),
-  recentlyAdded: (limit = 50) => invoke<Track[]>("get_recently_added", { limit }),
+  byAlbum: (albumId: number) =>
+    invoke<Track[]>("get_album_tracks", { albumId }),
+  byArtist: (artistId: number) =>
+    invoke<Track[]>("get_artist_tracks", { artistId }),
+  recentlyAdded: (limit = 50) =>
+    invoke<Track[]>("get_recently_added", { limit }),
   setFavorite: (trackId: number, favorite: boolean) =>
     invoke<void>("set_favorite", { trackId, favorite }),
   recordPlay: (trackId: number, durationPlayedMs: number, completed: boolean) =>

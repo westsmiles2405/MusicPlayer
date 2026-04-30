@@ -1,9 +1,9 @@
-mod error;
-mod db;
 mod commands;
-mod player;
+mod db;
+mod error;
 mod library;
 mod metadata;
+mod player;
 mod system;
 
 use tauri::Manager;
@@ -13,13 +13,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            let app_data_dir = app.path().app_data_dir()
-                .expect("no app_data_dir");
+            let app_data_dir = app.path().app_data_dir().expect("no app_data_dir");
             std::fs::create_dir_all(&app_data_dir).ok();
             let db_path = app_data_dir.join("musicplayer.db");
             log::info!("opening DB at {}", db_path.display());
-            let db = db::Database::open(&db_path)
-                .expect("failed to open database");
+            let db = db::Database::open(&db_path).expect("failed to open database");
             app.manage(db);
             log::info!("MusicPlayer v{} 启动", app.package_info().version);
             Ok(())

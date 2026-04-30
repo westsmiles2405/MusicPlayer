@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Play queue: manages current track, history, and upcoming tracks
 
 pub struct PlayQueue {}

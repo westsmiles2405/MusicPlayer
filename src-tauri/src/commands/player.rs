@@ -1,5 +1,6 @@
-use tauri::State;
+#![allow(dead_code, unused_imports)]
 use crate::error::AppResult;
+use tauri::State;
 
 #[tauri::command]
 pub async fn play(track_id: i64) -> AppResult<()> {

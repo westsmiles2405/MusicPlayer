@@ -1,19 +1,19 @@
 //! Database connection wrapper. Registered as Tauri State so commands can `state.with_conn(...)`.
 
-pub mod schema;
-pub mod tracks;
 pub mod albums;
 pub mod artists;
-pub mod playlists;
 pub mod play_history;
+pub mod playlists;
+pub mod schema;
 pub mod search;
+pub mod tracks;
 
 #[cfg(test)]
 pub(crate) mod testing;
 
-use std::path::Path;
 use parking_lot::Mutex;
 use rusqlite::Connection;
+use std::path::Path;
 
 use crate::error::AppResult;
 
@@ -34,7 +34,9 @@ impl Database {
              PRAGMA journal_size_limit = 67108864;",
         )?;
         schema::apply_pending(&conn)?;
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// 临时拿到连接执行查询；在锁的作用域内运行 closure。
@@ -58,7 +60,10 @@ mod tests {
         let path = dir.path().join("test.db");
         let db = Database::open(&path).unwrap();
         let v: i64 = db.with_conn(|c| {
-            c.query_row("SELECT MAX(version) FROM schema_migrations", [], |r| r.get(0)).unwrap()
+            c.query_row("SELECT MAX(version) FROM schema_migrations", [], |r| {
+                r.get(0)
+            })
+            .unwrap()
         });
         assert_eq!(v, 2);
     }

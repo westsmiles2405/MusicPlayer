@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Track queries (read + write).
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
@@ -125,10 +126,23 @@ pub fn insert(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult<i64> {
             ?18, NULL, ?18, ?18
          )",
         params![
-            t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
-            t.album_id, t.primary_artist_id, t.album_artist_id,
-            t.track_no, t.disc_no, t.year, t.genre,
-            t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
+            t.file_path,
+            t.file_size,
+            t.file_modified_at,
+            t.hash,
+            t.title,
+            t.album_id,
+            t.primary_artist_id,
+            t.album_artist_id,
+            t.track_no,
+            t.disc_no,
+            t.year,
+            t.genre,
+            t.duration_ms,
+            t.bitrate,
+            t.sample_rate,
+            t.channels,
+            t.codec,
             now_ms,
         ],
     )?;
@@ -152,7 +166,9 @@ pub fn update_by_path(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult
             |r| r.get(0),
         )
         .map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => crate::error::AppError::NotFound(format!("track at {}", t.file_path)),
+            rusqlite::Error::QueryReturnedNoRows => {
+                crate::error::AppError::NotFound(format!("track at {}", t.file_path))
+            }
             other => other.into(),
         })?;
     conn.execute(
@@ -164,10 +180,23 @@ pub fn update_by_path(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult
             last_seen_at = ?18, missing_at = NULL, updated_at = ?18
          WHERE id = ?1",
         params![
-            id, t.file_size, t.file_modified_at, t.hash, t.title,
-            t.album_id, t.primary_artist_id, t.album_artist_id,
-            t.track_no, t.disc_no, t.year, t.genre,
-            t.duration_ms, t.bitrate, t.sample_rate, t.channels, t.codec,
+            id,
+            t.file_size,
+            t.file_modified_at,
+            t.hash,
+            t.title,
+            t.album_id,
+            t.primary_artist_id,
+            t.album_artist_id,
+            t.track_no,
+            t.disc_no,
+            t.year,
+            t.genre,
+            t.duration_ms,
+            t.bitrate,
+            t.sample_rate,
+            t.channels,
+            t.codec,
             now_ms,
         ],
     )?;
@@ -176,8 +205,11 @@ pub fn update_by_path(conn: &Connection, t: &NewTrack, now_ms: i64) -> AppResult
 
 /// 软删除：设置 missing_at = now，保留 row 不破坏 playlist/play_history 引用。
 pub fn mark_missing(conn: &Connection, ids: &[i64], now_ms: i64) -> AppResult<usize> {
-    if ids.is_empty() { return Ok(0); }
-    let mut stmt = conn.prepare("UPDATE tracks SET missing_at = ?1, updated_at = ?1 WHERE id = ?2")?;
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let mut stmt =
+        conn.prepare("UPDATE tracks SET missing_at = ?1, updated_at = ?1 WHERE id = ?2")?;
     let mut updated = 0;
     for &id in ids {
         updated += stmt.execute(params![now_ms, id])?;
@@ -187,8 +219,12 @@ pub fn mark_missing(conn: &Connection, ids: &[i64], now_ms: i64) -> AppResult<us
 
 /// 标记为重新发现：清除 missing_at，更新 last_seen_at。
 pub fn mark_present(conn: &Connection, ids: &[i64], now_ms: i64) -> AppResult<usize> {
-    if ids.is_empty() { return Ok(0); }
-    let mut stmt = conn.prepare("UPDATE tracks SET missing_at = NULL, last_seen_at = ?1, updated_at = ?1 WHERE id = ?2")?;
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let mut stmt = conn.prepare(
+        "UPDATE tracks SET missing_at = NULL, last_seen_at = ?1, updated_at = ?1 WHERE id = ?2",
+    )?;
     let mut updated = 0;
     for &id in ids {
         updated += stmt.execute(params![now_ms, id])?;
@@ -198,24 +234,35 @@ pub fn mark_present(conn: &Connection, ids: &[i64], now_ms: i64) -> AppResult<us
 
 /// 用 hash 找已知曲目（用于"文件被移动后保留收藏/播放次数"的身份匹配）。
 pub fn find_by_hash(conn: &Connection, hash: &str) -> AppResult<Vec<Track>> {
-    let mut stmt = conn.prepare(
-        "SELECT * FROM tracks WHERE hash = ?1 AND missing_at IS NULL ORDER BY id",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT * FROM tracks WHERE hash = ?1 AND missing_at IS NULL ORDER BY id")?;
     let rows = stmt.query_map(params![hash], Track::from_row)?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 
 pub fn find_by_path(conn: &Connection, path: &str) -> AppResult<Option<Track>> {
     let opt = conn
-        .query_row("SELECT * FROM tracks WHERE file_path = ?1", params![path], Track::from_row)
+        .query_row(
+            "SELECT * FROM tracks WHERE file_path = ?1",
+            params![path],
+            Track::from_row,
+        )
         .optional()?;
     Ok(opt)
 }
 
 /// 关联 (track_id, artist_id, role)。同 (track_id, role) 已存在时无视。
-pub fn link_artist(conn: &Connection, track_id: i64, artist_id: i64, role: &str, position: i32) -> AppResult<()> {
+pub fn link_artist(
+    conn: &Connection,
+    track_id: i64,
+    artist_id: i64,
+    role: &str,
+    position: i32,
+) -> AppResult<()> {
     conn.execute(
         "INSERT OR IGNORE INTO track_artists (track_id, artist_id, role, position) VALUES (?1, ?2, ?3, ?4)",
         params![track_id, artist_id, role, position],
@@ -234,7 +281,12 @@ pub enum TrackSort {
 }
 
 /// 列表查询。`missing_at IS NULL` 自动过滤已软删除的歌曲。
-pub fn list(conn: &Connection, sort: TrackSort, limit: i64, offset: i64) -> AppResult<Vec<TrackView>> {
+pub fn list(
+    conn: &Connection,
+    sort: TrackSort,
+    limit: i64,
+    offset: i64,
+) -> AppResult<Vec<TrackView>> {
     let order_by = match sort {
         TrackSort::Title => "t.title COLLATE NOCASE ASC",
         TrackSort::Artist => "ar.name COLLATE NOCASE ASC, t.title COLLATE NOCASE ASC",
@@ -242,7 +294,10 @@ pub fn list(conn: &Connection, sort: TrackSort, limit: i64, offset: i64) -> AppR
         TrackSort::AddedAt => "t.added_at DESC",
         TrackSort::LastPlayed => "t.last_played_at DESC NULLS LAST",
     };
-    let sql = format!("{} ORDER BY {order_by} LIMIT ?1 OFFSET ?2", base_track_view_select(" WHERE t.missing_at IS NULL"));
+    let sql = format!(
+        "{} ORDER BY {order_by} LIMIT ?1 OFFSET ?2",
+        base_track_view_select(" WHERE t.missing_at IS NULL")
+    );
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params![limit, offset], track_view_from_row)?;
     collect(rows)
@@ -250,7 +305,9 @@ pub fn list(conn: &Connection, sort: TrackSort, limit: i64, offset: i64) -> AppR
 
 pub fn get_view_by_id(conn: &Connection, id: i64) -> AppResult<Option<TrackView>> {
     let sql = format!("{} WHERE t.id = ?1", base_track_view_select(""));
-    let opt = conn.query_row(&sql, params![id], track_view_from_row).optional()?;
+    let opt = conn
+        .query_row(&sql, params![id], track_view_from_row)
+        .optional()?;
     Ok(opt)
 }
 
@@ -322,10 +379,13 @@ fn track_view_from_row(row: &Row<'_>) -> rusqlite::Result<TrackView> {
 }
 
 fn collect<T, I>(iter: I) -> AppResult<Vec<T>>
-where I: IntoIterator<Item = rusqlite::Result<T>>
+where
+    I: IntoIterator<Item = rusqlite::Result<T>>,
 {
     let mut out = Vec::new();
-    for r in iter { out.push(r?); }
+    for r in iter {
+        out.push(r?);
+    }
     Ok(out)
 }
 
@@ -342,9 +402,21 @@ mod tests {
     fn insert_creates_track_and_main_artist_link() {
         let conn = test_db();
         let id = make_basic_track(&conn, "Hello");
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM tracks WHERE id = ?1", params![id], |r| r.get(0)).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tracks WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
-        let role: String = conn.query_row("SELECT role FROM track_artists WHERE track_id = ?1", params![id], |r| r.get(0)).unwrap();
+        let role: String = conn
+            .query_row(
+                "SELECT role FROM track_artists WHERE track_id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(role, "main");
     }
 
@@ -352,14 +424,29 @@ mod tests {
     fn insert_duplicate_path_fails() {
         let conn = test_db();
         let _ = make_basic_track(&conn, "Hello");
-        let artist = artists::find_by_name(&conn, "TestArtist").unwrap().unwrap().id;
+        let artist = artists::find_by_name(&conn, "TestArtist")
+            .unwrap()
+            .unwrap()
+            .id;
         let album = albums::upsert(&conn, "TestAlbum", artist, Some(2024), 100).unwrap();
         let dup = NewTrack {
             file_path: "/music/Hello.mp3".into(),
-            file_size: 1, file_modified_at: 0, hash: None, title: "X".into(),
-            album_id: Some(album), primary_artist_id: Some(artist), album_artist_id: Some(artist),
-            track_no: None, disc_no: None, year: None, genre: None,
-            duration_ms: 0, bitrate: None, sample_rate: None, channels: None, codec: None,
+            file_size: 1,
+            file_modified_at: 0,
+            hash: None,
+            title: "X".into(),
+            album_id: Some(album),
+            primary_artist_id: Some(artist),
+            album_artist_id: Some(artist),
+            track_no: None,
+            disc_no: None,
+            year: None,
+            genre: None,
+            duration_ms: 0,
+            bitrate: None,
+            sample_rate: None,
+            channels: None,
+            codec: None,
         };
         assert!(insert(&conn, &dup, 100).is_err());
     }
@@ -368,19 +455,37 @@ mod tests {
     fn update_by_path_overwrites_metadata() {
         let conn = test_db();
         let id = make_basic_track(&conn, "Hello");
-        let artist = artists::find_by_name(&conn, "TestArtist").unwrap().unwrap().id;
+        let artist = artists::find_by_name(&conn, "TestArtist")
+            .unwrap()
+            .unwrap()
+            .id;
         let album = albums::upsert(&conn, "TestAlbum", artist, Some(2024), 100).unwrap();
         let edited = NewTrack {
             file_path: "/music/Hello.mp3".into(),
-            file_size: 5_000_000, file_modified_at: 9000,
-            hash: Some("new-hash".into()), title: "Hello (Remastered)".into(),
-            album_id: Some(album), primary_artist_id: Some(artist), album_artist_id: Some(artist),
-            track_no: Some(2), disc_no: Some(1), year: Some(2025), genre: None,
-            duration_ms: 250_000, bitrate: Some(320), sample_rate: Some(44_100), channels: Some(2), codec: Some("mp3".into()),
+            file_size: 5_000_000,
+            file_modified_at: 9000,
+            hash: Some("new-hash".into()),
+            title: "Hello (Remastered)".into(),
+            album_id: Some(album),
+            primary_artist_id: Some(artist),
+            album_artist_id: Some(artist),
+            track_no: Some(2),
+            disc_no: Some(1),
+            year: Some(2025),
+            genre: None,
+            duration_ms: 250_000,
+            bitrate: Some(320),
+            sample_rate: Some(44_100),
+            channels: Some(2),
+            codec: Some("mp3".into()),
         };
         let same_id = update_by_path(&conn, &edited, 9999).unwrap();
         assert_eq!(same_id, id);
-        let title: String = conn.query_row("SELECT title FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
+        let title: String = conn
+            .query_row("SELECT title FROM tracks WHERE id=?1", params![id], |r| {
+                r.get(0)
+            })
+            .unwrap();
         assert_eq!(title, "Hello (Remastered)");
     }
 
@@ -389,10 +494,22 @@ mod tests {
         let conn = test_db();
         let id = make_basic_track(&conn, "X");
         assert_eq!(mark_missing(&conn, &[id], 1000).unwrap(), 1);
-        let m: Option<i64> = conn.query_row("SELECT missing_at FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
+        let m: Option<i64> = conn
+            .query_row(
+                "SELECT missing_at FROM tracks WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(m, Some(1000));
         assert_eq!(mark_present(&conn, &[id], 2000).unwrap(), 1);
-        let m: Option<i64> = conn.query_row("SELECT missing_at FROM tracks WHERE id=?1", params![id], |r| r.get(0)).unwrap();
+        let m: Option<i64> = conn
+            .query_row(
+                "SELECT missing_at FROM tracks WHERE id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(m, None);
     }
 
@@ -411,8 +528,14 @@ mod tests {
         let id = make_basic_track(&conn, "Hello");
         let other = artists::upsert_by_name(&conn, "Featured", 100).unwrap();
         link_artist(&conn, id, other, "featured", 0).unwrap();
-        link_artist(&conn, id, other, "featured", 0).unwrap();  // 第二次必须不报错
-        let n: i64 = conn.query_row("SELECT COUNT(*) FROM track_artists WHERE track_id=?1", params![id], |r| r.get(0)).unwrap();
+        link_artist(&conn, id, other, "featured", 0).unwrap(); // 第二次必须不报错
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM track_artists WHERE track_id=?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(n, 2, "main + featured");
     }
 
@@ -438,15 +561,30 @@ mod tests {
     #[test]
     fn list_by_album_orders_by_disc_and_track_no() {
         let conn = test_db();
-        let _ = make_basic_track(&conn, "Track1");  // track_no=1
-        let artist = artists::find_by_name(&conn, "TestArtist").unwrap().unwrap().id;
+        let _ = make_basic_track(&conn, "Track1"); // track_no=1
+        let artist = artists::find_by_name(&conn, "TestArtist")
+            .unwrap()
+            .unwrap()
+            .id;
         let album = albums::upsert(&conn, "TestAlbum", artist, Some(2024), 100).unwrap();
         let nt2 = NewTrack {
             file_path: "/music/Track0.mp3".into(),
-            file_size: 1, file_modified_at: 0, hash: None, title: "Track0".into(),
-            album_id: Some(album), primary_artist_id: Some(artist), album_artist_id: Some(artist),
-            track_no: Some(0), disc_no: Some(1), year: None, genre: None,
-            duration_ms: 0, bitrate: None, sample_rate: None, channels: None, codec: None,
+            file_size: 1,
+            file_modified_at: 0,
+            hash: None,
+            title: "Track0".into(),
+            album_id: Some(album),
+            primary_artist_id: Some(artist),
+            album_artist_id: Some(artist),
+            track_no: Some(0),
+            disc_no: Some(1),
+            year: None,
+            genre: None,
+            duration_ms: 0,
+            bitrate: None,
+            sample_rate: None,
+            channels: None,
+            codec: None,
         };
         insert(&conn, &nt2, 100).unwrap();
         let views = list_by_album(&conn, album).unwrap();
@@ -460,9 +598,17 @@ mod tests {
         let conn = test_db();
         let id_old = make_basic_track(&conn, "Old");
         // 手动改 added_at 让"Old"早于另一首
-        conn.execute("UPDATE tracks SET added_at = 100 WHERE id = ?1", params![id_old]).unwrap();
+        conn.execute(
+            "UPDATE tracks SET added_at = 100 WHERE id = ?1",
+            params![id_old],
+        )
+        .unwrap();
         let _id_new = make_basic_track(&conn, "New");
-        conn.execute("UPDATE tracks SET added_at = 999 WHERE file_path = '/music/New.mp3'", []).unwrap();
+        conn.execute(
+            "UPDATE tracks SET added_at = 999 WHERE file_path = '/music/New.mp3'",
+            [],
+        )
+        .unwrap();
         let views = recently_added(&conn, 10).unwrap();
         assert_eq!(views[0].track.title, "New");
         assert_eq!(views[1].track.title, "Old");
@@ -480,4 +626,3 @@ mod tests {
         assert!(!v.track.is_favorite);
     }
 }
-

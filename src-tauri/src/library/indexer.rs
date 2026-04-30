@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Incremental indexer: compares hash + mtime to detect changes
 
 pub struct Indexer {}

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Artist queries.
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
@@ -42,10 +43,14 @@ pub fn upsert_by_name(conn: &Connection, name: &str, now_ms: i64) -> AppResult<i
 }
 
 pub fn get_all(conn: &Connection) -> AppResult<Vec<Artist>> {
-    let mut stmt = conn.prepare("SELECT id, name, added_at, updated_at FROM artists ORDER BY name COLLATE NOCASE")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, name, added_at, updated_at FROM artists ORDER BY name COLLATE NOCASE",
+    )?;
     let rows = stmt.query_map([], Artist::from_row)?;
     let mut out = Vec::new();
-    for r in rows { out.push(r?); }
+    for r in rows {
+        out.push(r?);
+    }
     Ok(out)
 }
 

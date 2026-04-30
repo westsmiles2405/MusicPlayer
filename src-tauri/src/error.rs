@@ -2,6 +2,7 @@ use serde::Serialize;
 
 /// 统一错误类型，经 Tauri IPC 传到前端
 #[derive(Debug, thiserror::Error, Serialize)]
+#[allow(dead_code)]
 #[serde(tag = "kind", content = "message")]
 pub enum AppError {
     #[error("未找到: {0}")]
@@ -58,7 +59,9 @@ mod tests {
         let r = conn.execute("SELECT no_such_column FROM no_such_table", []);
         let err: AppError = r.unwrap_err().into();
         match err {
-            AppError::Database(msg) => assert!(msg.contains("no_such_table") || msg.contains("no such")),
+            AppError::Database(msg) => {
+                assert!(msg.contains("no_such_table") || msg.contains("no such"))
+            }
             other => panic!("expected Database, got {other:?}"),
         }
     }
