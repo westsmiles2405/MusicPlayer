@@ -65,6 +65,6 @@ mod tests {
             })
             .unwrap()
         });
-        assert_eq!(v, 2);
+        assert_eq!(v, 3);
     }
 }
