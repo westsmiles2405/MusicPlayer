@@ -61,6 +61,17 @@ pub fn upsert(
     Ok(id)
 }
 
+/// 在已有事务中 upsert album（不打开新事务）。
+pub fn upsert_in_tx(
+    conn: &Connection,
+    name: &str,
+    album_artist_id: i64,
+    year: Option<i32>,
+    now_ms: i64,
+) -> AppResult<i64> {
+    upsert(conn, name, album_artist_id, year, now_ms)
+}
+
 pub fn get_all(conn: &Connection) -> AppResult<Vec<AlbumView>> {
     let mut stmt = conn.prepare(
         "SELECT a.id, a.name, a.album_artist_id, a.year, a.cover_path, a.added_at, a.updated_at,
@@ -115,6 +126,16 @@ pub fn set_cover_path(conn: &Connection, id: i64, cover_path: &str, now_ms: i64)
         return Err(crate::error::AppError::NotFound(format!("album {id}")));
     }
     Ok(())
+}
+
+/// 在已有事务中设置封面路径。
+pub fn set_cover_path_in_tx(
+    conn: &Connection,
+    id: i64,
+    cover_path: &str,
+    now_ms: i64,
+) -> AppResult<()> {
+    set_cover_path(conn, id, cover_path, now_ms)
 }
 
 #[cfg(test)]
