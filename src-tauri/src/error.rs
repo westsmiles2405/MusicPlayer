@@ -4,6 +4,9 @@ use serde::Serialize;
 #[derive(Debug, thiserror::Error, Serialize)]
 #[serde(tag = "kind", content = "message")]
 pub enum AppError {
+    #[error("未找到: {0}")]
+    NotFound(String),
+
     #[error("数据库错误: {0}")]
     Database(String),
 
@@ -36,3 +39,27 @@ impl From<rusqlite::Error> for AppError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn not_found_serializes_with_kind_tag() {
+        let err = AppError::NotFound("playlist 5".into());
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains(r#""kind":"NotFound""#));
+        assert!(json.contains(r#""message":"playlist 5""#));
+    }
+
+    #[test]
+    fn database_error_from_rusqlite_preserves_message() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        let r = conn.execute("SELECT no_such_column FROM no_such_table", []);
+        let err: AppError = r.unwrap_err().into();
+        match err {
+            AppError::Database(msg) => assert!(msg.contains("no_such_table") || msg.contains("no such")),
+            other => panic!("expected Database, got {other:?}"),
+        }
+    }
+}
