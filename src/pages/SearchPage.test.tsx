@@ -4,6 +4,21 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const search = vi.fn();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue({
+    status: "idle",
+    current: null,
+    positionMs: 0,
+    durationMs: 0,
+    volume: 0.8,
+    muted: false,
+    queueIndex: null,
+    queueLen: 0,
+    repeatMode: "off",
+    shuffle: false,
+  }),
+}));
+
 vi.mock("@/repositories/searchRepo", () => ({
   searchRepo: { search },
 }));
