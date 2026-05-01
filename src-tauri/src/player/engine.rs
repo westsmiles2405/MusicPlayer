@@ -211,6 +211,10 @@ pub struct AudioEngine {
     session: Option<PlaybackSession>,
     last_tick: Instant,
     gapless: GaplessPredecoder,
+    /// Leftover samples from a partial ringbuf write. Written first on next tick.
+    pending_samples: Vec<f32>,
+    /// File-position of the first sample in `pending_samples`.
+    pending_start_ms: i64,
 }
 
 impl AudioEngine {
@@ -236,6 +240,8 @@ impl AudioEngine {
                 session: None,
                 last_tick: Instant::now(),
                 gapless: GaplessPredecoder::new(),
+                pending_samples: Vec::new(),
+                pending_start_ms: 0,
             };
             engine.run();
         })
@@ -372,6 +378,7 @@ impl AudioEngine {
             .event_tx
             .send(PlayerEvent::Snapshot(self.snapshot.clone()));
         self.audio.clear();
+        self.pending_samples.clear();
         if let Some(ref mut decoder) = self.decoder {
             match decoder.seek_ms(target_ms) {
                 Ok(pos) => {
@@ -405,6 +412,7 @@ impl AudioEngine {
         self.finish_session(SessionEndReason::Stop);
         self.gapless.cancel();
         self.audio.clear();
+        self.pending_samples.clear();
         self.stream = None;
         self.decoder = None;
         self.queue = None;
@@ -515,6 +523,7 @@ impl AudioEngine {
                 }
                 self.decoder = Some(decoder);
                 self.audio.clear();
+                self.pending_samples.clear();
                 let session = PlaybackSession::new(track.id, now_ms());
                 self.session = Some(session);
                 self.snapshot.status = PlaybackStatus::Playing;
@@ -562,14 +571,34 @@ impl AudioEngine {
     fn advance_next(&mut self) {
         self.decoder = None;
         self.audio.clear();
-        // Try to use a pre-decoded gapless result first.
+        self.pending_samples.clear();
+
+        // Advance the queue first so current() reflects the NEXT track.
+        let next_track_id = if let Some(ref mut q) = self.queue {
+            match q.next() {
+                QueueMove::Track(id) => Some(id),
+                QueueMove::RestartCurrent(id) => Some(id),
+                QueueMove::Ended => {
+                    self.snapshot.status = PlaybackStatus::Ended;
+                    self.snapshot.current = None;
+                    let _ = self
+                        .event_tx
+                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                    return;
+                }
+            }
+        } else {
+            None
+        };
+
+        // Now try to consume a pre-decoded gapless result for the new track.
         if let Some(GaplessResult::Ready {
             track_id,
             decoder,
             first_chunk,
         }) = self.gapless.poll()
         {
-            if Some(track_id) == self.queue.as_ref().and_then(|q| q.current()) {
+            if Some(track_id) == next_track_id {
                 if self.stream.is_none() {
                     match open_default_stream(
                         self.audio.clone(),
@@ -593,16 +622,11 @@ impl AudioEngine {
                     }
                 }
                 self.decoder = Some(decoder);
-                self.audio.clear();
                 self.producer.push_samples(&first_chunk.samples);
                 self.snapshot.status = PlaybackStatus::Playing;
                 self.snapshot.position_ms = first_chunk.start_ms + first_chunk.duration_ms;
                 let session = PlaybackSession::new(track_id, now_ms());
-                if let Some(ref mut s) = self.session {
-                    *s = session;
-                } else {
-                    self.session = Some(session);
-                }
+                self.session = Some(session);
                 self.snapshot.current = self
                     .tracks
                     .iter()
@@ -626,23 +650,9 @@ impl AudioEngine {
                 return;
             }
         }
-        if let Some(ref mut q) = self.queue {
-            match q.next() {
-                QueueMove::Track(_) => {
-                    self.start_current_track();
-                }
-                QueueMove::RestartCurrent(_) => {
-                    self.start_current_track();
-                }
-                QueueMove::Ended => {
-                    self.snapshot.status = PlaybackStatus::Ended;
-                    self.snapshot.current = None;
-                    let _ = self
-                        .event_tx
-                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
-                }
-            }
-        }
+
+        // Fall through: start the new track normally.
+        self.start_current_track();
     }
 
     fn go_previous(&mut self) {
@@ -702,23 +712,28 @@ impl AudioEngine {
         if let Some(ref mut session) = self.session {
             session.add_real_played_ms(delta_ms);
         }
+
+        // Push leftover samples from the previous partial write first.
+        self.flush_pending();
+
         if let Some(ref mut decoder) = self.decoder {
             for _ in 0..4 {
                 match decoder.read_chunk(4096) {
                     Ok(Some(chunk)) => {
                         let total = chunk.samples.len();
                         let pushed = self.producer.push_samples(&chunk.samples);
-                        // Advance position only by samples that actually landed
-                        // in the buffer (stereo = 2 channels, 48k rate).
                         let pushed_frames = (pushed / 2) as u64;
                         let pushed_duration_ms = (pushed_frames * 1000 / 48_000) as i64;
                         self.snapshot.position_ms = chunk.start_ms + pushed_duration_ms;
                         if let Some(ref mut session) = self.session {
                             session.mark_position(self.snapshot.position_ms);
                         }
-                        // Buffer full — stop decoding this tick so audio device
-                        // has time to drain. Resume on the next tick.
                         if pushed < total {
+                            // Save the unpushed tail so it is written first
+                            // on the next tick instead of being discarded.
+                            self.pending_samples
+                                .extend_from_slice(&chunk.samples[pushed..]);
+                            self.pending_start_ms = chunk.start_ms + pushed_duration_ms;
                             break;
                         }
                     }
@@ -748,6 +763,22 @@ impl AudioEngine {
             position_ms: self.snapshot.position_ms,
             duration_ms: self.snapshot.duration_ms,
         });
+    }
+
+    /// Push any leftover samples from a previous partial ringbuf write.
+    /// Called at the top of every tick so pending data always goes first.
+    fn flush_pending(&mut self) {
+        if self.pending_samples.is_empty() {
+            return;
+        }
+        let pushed = self.producer.push_samples(&self.pending_samples);
+        if pushed > 0 {
+            let pushed_frames = (pushed / 2) as u64;
+            let pushed_duration = (pushed_frames * 1000 / 48_000) as i64;
+            self.snapshot.position_ms = self.pending_start_ms + pushed_duration;
+            self.pending_start_ms += pushed_duration;
+            self.pending_samples.drain(..pushed);
+        }
     }
 
     fn maybe_start_gapless_predecode(&mut self) {
