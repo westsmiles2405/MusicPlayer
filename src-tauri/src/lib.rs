@@ -20,11 +20,37 @@ pub fn run() {
             let db_path = app_data_dir.join("musicplayer.db");
             log::info!("opening DB at {}", db_path.display());
             let db = db::Database::open(&db_path).expect("failed to open database");
+
+            let player = player::manager::PlayerManager::new(app.handle().clone(), db.clone());
             app.manage(db);
+            app.manage(player);
+
             log::info!("MusicPlayer v{} 启动", app.package_info().version);
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                if let Some(manager) = window
+                    .app_handle()
+                    .try_state::<player::manager::PlayerManager>()
+                {
+                    manager.shutdown();
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
+            commands::player::player_play,
+            commands::player::player_pause,
+            commands::player::player_resume,
+            commands::player::player_toggle,
+            commands::player::player_stop,
+            commands::player::player_seek,
+            commands::player::player_next,
+            commands::player::player_previous,
+            commands::player::player_set_volume,
+            commands::player::player_set_muted,
+            commands::player::player_toggle_mute,
+            commands::player::player_get_state,
             commands::player::play,
             commands::player::pause,
             commands::player::resume,
