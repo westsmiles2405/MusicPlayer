@@ -18,7 +18,7 @@ export function TrackTableView({
 }: {
   rows: TrackTableRow[];
   queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
-  onPlay: (row: TrackTableRow) => void;
+  onPlay: (row: TrackTableRow, index: number) => void;
   onRemove?: (row: TrackTableRow) => void;
   onReorderPlaylist?: (
     sourcePosition: number,
@@ -38,7 +38,7 @@ export function TrackTableView({
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
+        {rows.map((row, index) => (
           <tr
             key={`${row.id}-${row.playlistPosition ?? queueContext}`}
             data-missing={row.missingAt !== null}
@@ -50,7 +50,7 @@ export function TrackTableView({
             <td>
               <button
                 type="button"
-                onClick={() => onPlay(row)}
+                onClick={() => onPlay(row, index)}
                 disabled={row.missingAt !== null}
                 aria-label={`播放 ${row.title}`}
               >

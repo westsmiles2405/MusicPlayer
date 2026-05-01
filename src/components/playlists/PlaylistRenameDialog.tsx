@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface PlaylistRenameDialogProps {
   open: boolean;
@@ -16,6 +16,13 @@ export function PlaylistRenameDialog({
   const [name, setName] = useState(initialName);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName(initialName);
+      setError(null);
+    }
+  }, [open, initialName]);
 
   if (!open) return null;
 

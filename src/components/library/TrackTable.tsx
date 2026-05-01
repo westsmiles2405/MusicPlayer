@@ -27,10 +27,35 @@ export function TrackTable({
   const { play } = usePlayer();
 
   const playableTracks = tracks.filter((t) => t.missingAt === null);
+  const playableIds = playableTracks.map((t) => t.id);
 
-  const handlePlay = (row: TrackTableRow) => {
-    const playableIds = playableTracks.map((t) => t.id);
-    const queueIndex = playableIds.indexOf(row.id);
+  // Map each playable row to its queue index, correctly handling duplicate track IDs
+  // by tracking which occurrence of each track ID we've seen.
+  const queueIndexByRow: number[] = [];
+  const seen = new Map<number, number>();
+  for (const t of tracks) {
+    if (t.missingAt !== null) {
+      queueIndexByRow.push(-1);
+      continue;
+    }
+    const nth = seen.get(t.id) ?? 0;
+    let queueIdx = -1;
+    let count = 0;
+    for (let i = 0; i < playableIds.length; i++) {
+      if (playableIds[i] === t.id) {
+        if (count === nth) {
+          queueIdx = i;
+          break;
+        }
+        count++;
+      }
+    }
+    queueIndexByRow.push(queueIdx);
+    seen.set(t.id, nth + 1);
+  }
+
+  const handlePlay = (row: TrackTableRow, rowIndex: number) => {
+    const queueIndex = queueIndexByRow[rowIndex] ?? -1;
     play(row.id, playableIds, queueIndex >= 0 ? queueIndex : undefined);
   };
 

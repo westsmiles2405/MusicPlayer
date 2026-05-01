@@ -1,19 +1,22 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 
-const invoke = vi.fn().mockResolvedValue({
-  status: "idle",
-  current: null,
-  positionMs: 0,
-  durationMs: 0,
-  volume: 0.8,
-  muted: false,
-  queueIndex: null,
-  queueLen: 0,
-  repeatMode: "off",
-  shuffle: false,
+const invoke = vi.fn((cmd: string) => {
+  if (cmd === "get_playlists") return Promise.resolve([]);
+  return Promise.resolve({
+    status: "idle",
+    current: null,
+    positionMs: 0,
+    durationMs: 0,
+    volume: 0.8,
+    muted: false,
+    queueIndex: null,
+    queueLen: 0,
+    repeatMode: "off",
+    shuffle: false,
+  });
 });
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
@@ -28,13 +31,15 @@ describe("AppShell", () => {
       defaultOptions: { queries: { retry: false } },
     });
 
-    render(
-      <QueryClientProvider client={qc}>
-        <MemoryRouter>
-          <AppShell />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    await act(async () => {
+      render(
+        <QueryClientProvider client={qc}>
+          <MemoryRouter>
+            <AppShell />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+    });
 
     expect(
       screen.getByRole("navigation", { name: "侧边栏" }),

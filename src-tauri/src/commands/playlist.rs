@@ -75,7 +75,5 @@ pub async fn reorder_playlist(
     source_position: i64,
     destination_position: i64,
 ) -> AppResult<()> {
-    db.with_conn(|c| {
-        playlists::reorder(c, playlist_id, source_position, destination_position)
-    })
+    db.with_conn(|c| playlists::reorder(c, playlist_id, source_position, destination_position))
 }

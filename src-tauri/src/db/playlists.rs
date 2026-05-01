@@ -131,10 +131,7 @@ pub fn list(conn: &Connection) -> AppResult<Vec<PlaylistSummary>> {
     Ok(out)
 }
 
-pub fn get_tracks(
-    conn: &Connection,
-    playlist_id: i64,
-) -> AppResult<Vec<PlaylistTrackView>> {
+pub fn get_tracks(conn: &Connection, playlist_id: i64) -> AppResult<Vec<PlaylistTrackView>> {
     use crate::db::tracks::{Track, TrackView};
     let mut stmt = conn.prepare(
         "SELECT t.id, t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
@@ -290,8 +287,7 @@ mod tests {
             .unwrap()
             .unwrap()
             .id;
-        let album =
-            crate::db::albums::upsert(conn, "TestAlbum", artist, Some(2024), 100).unwrap();
+        let album = crate::db::albums::upsert(conn, "TestAlbum", artist, Some(2024), 100).unwrap();
         let mk = |path: &str, title: &str| -> i64 {
             let nt = crate::db::tracks::NewTrack {
                 file_path: path.into(),
@@ -341,9 +337,7 @@ mod tests {
         let conn = test_db();
         let (pid, ids) = setup_with_three_tracks(&conn);
         let positions: Vec<i64> = conn
-            .prepare(
-                "SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position",
-            )
+            .prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position")
             .unwrap()
             .query_map(params![pid], |r| r.get(0))
             .unwrap()
