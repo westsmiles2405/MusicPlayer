@@ -1,6 +1,6 @@
 {
   "name": "musicplayer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "Apple Music style desktop music player built with Tauri 2.x + React 19",
   "license": "MIT",
