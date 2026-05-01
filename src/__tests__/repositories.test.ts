@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 describe("v0.2.0 core data layer smoke", () => {
   it("repository modules export their repos", async () => {
@@ -11,7 +13,9 @@ describe("v0.2.0 core data layer smoke", () => {
 
     expect(trackRepo.list).toBeDefined();
     expect(albumRepo.list).toBeDefined();
+    expect(albumRepo.get).toBeDefined();
     expect(artistRepo.list).toBeDefined();
+    expect(artistRepo.get).toBeDefined();
     expect(playlistRepo.list).toBeDefined();
     expect(searchRepo.query).toBeDefined();
     expect(historyRepo.recent).toBeDefined();

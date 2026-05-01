@@ -11,10 +11,14 @@ export interface Playlist {
   trackCount: number;
 }
 
+export interface PlaylistTrack extends Track {
+  playlistPosition: number;
+}
+
 export const playlistRepo = {
   list: () => invoke<Playlist[]>("get_playlists"),
   tracks: (playlistId: number) =>
-    invoke<Track[]>("get_playlist_tracks", { playlistId }),
+    invoke<PlaylistTrack[]>("get_playlist_tracks", { playlistId }),
   create: (name: string, description?: string) =>
     invoke<number>("create_playlist", {
       name,
@@ -28,6 +32,6 @@ export const playlistRepo = {
     invoke<number>("add_to_playlist", { playlistId, trackId }),
   removeTrack: (playlistId: number, trackId: number, position: number) =>
     invoke<void>("remove_from_playlist", { playlistId, trackId, position }),
-  reorder: (playlistId: number, fromPosition: number, toPosition: number) =>
-    invoke<void>("reorder_playlist", { playlistId, fromPosition, toPosition }),
+  reorder: (playlistId: number, sourcePosition: number, destinationPosition: number) =>
+    invoke<void>("reorder_playlist", { playlistId, sourcePosition, destinationPosition }),
 };
