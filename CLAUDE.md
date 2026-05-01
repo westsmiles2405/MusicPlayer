@@ -112,6 +112,7 @@ MusicPlayer/
 12. **PlayerCommand 双层架构**。Manager 层接收 `PlayerCommand`（裸 track ID），解析 DB 后转发 `EngineCommand`（含已解析 `EngineTrack`）给 Engine。Engine 永远不碰 DB。
 13. **Buffer 背压模型**。`push_samples()` 返回实际写入的样本数；position 仅按已写入样本推进。ringbuf 满时未写入的 chunk 尾部存入 `pending_samples`，下个 tick 优先写入。`flush_pending()` 后若仍有残留 → 跳过 decoder 本 tick。
 14. **Gapless 只在失效路径 cancel**。`finish_session(Stop/Replaced/DecodeError/OutputError/Shutdown)` 取消预解码；`Completed/Next/Previous` 保留结果，供 `advance_next()` 队列推进后消费。
+15. **播放列表允许重复 track ID**。`playlist_tracks` 表支持同一 `track_id` 多次出现。前端计算 queue index 时不能用 `indexOf(id)`（总是返回第一次出现），必须按行在数组中的实际位置做 occurrence-aware 映射。
 
 ## 6. 工程规范
 
@@ -184,6 +185,8 @@ CARGO_TARGET_DIR=/tmp/musicplayer-target cargo check --manifest-path src-tauri/C
 - **macOS Now Playing 集成**：✅ 已通过 objc2 0.6 + objc2-media-player 0.3 + block2 0.6 实现。注意：`msg_send!` 参数间需要逗号（objc2 0.6 语法），`NSMutableDictionary::insert` 的 `CopyingHelper` 约束对 `&NSString` 不满足（用 `msg_send!` 绕开），`RcBlock` 不是 `Send`（丢弃 `addTargetWithHandler` 返回值即可，MPRemoteCommandCenter 内部 retain）。
 - **FLAC / ALAC 兼容性**：symphonia 对部分变体支持有限，必要时 fallback 到 ffmpeg-rs（Phase 1.x）。
 - **Web 端音频**：用 Web Audio API 兜底，体验弱化（无 Gapless / 无低延迟）。
+- **Vitest `act()` 警告**：当组件（如 MiniPlayer）通过事件监听触发异步状态更新时，测试中 `render()` 需包裹在 `await act(async () => {...})` 内，且 `invoke` mock 需按命令名返回不同数据（不能用单一 `mockResolvedValue`），否则 React Query flush 时会拿到错误的返回值类型。
+- **对话框状态重置**：用 `useState(initialProp)` 初始化的受控组件，在父组件保持挂载的情况下关闭再打开不会重置状态。必须加 `useEffect` 同步 `open` 和 `initialProp` 变化。
 
 ## 10. Claude 工作约定
 
