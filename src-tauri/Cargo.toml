@@ -26,6 +26,9 @@ lofty = "0.24"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 image = "0.25"
 walkdir = "2"
+crossbeam-channel = "0.5"
+ringbuf = "0.4"
+uuid = { version = "1", features = ["v4"] }
 parking_lot = "0.12"
 log = "0.4"
 env_logger = "0.11"
