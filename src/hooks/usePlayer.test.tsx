@@ -1,5 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 
 const unlistenA = vi.fn();
 const unlistenB = vi.fn();
@@ -43,8 +45,14 @@ vi.mock("@/repositories/playerRepo", () => ({
 
 describe("usePlayerEvents", () => {
   it("registers and cleans playback listeners", async () => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
     const { usePlayerEvents } = await import("@/hooks/usePlayer");
-    const hook = renderHook(() => usePlayerEvents());
+    const hook = renderHook(() => usePlayerEvents(), { wrapper });
     await waitFor(() => expect(listen).toHaveBeenCalledTimes(4));
     hook.unmount();
     await waitFor(() => expect(unlistenD).toHaveBeenCalled());
