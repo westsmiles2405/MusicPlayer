@@ -6,6 +6,7 @@ export interface TrackTableRow {
   durationMs: number;
   missingAt: number | null;
   playlistPosition?: number;
+  isFavorite?: boolean;
 }
 
 export function TrackTableView({
@@ -13,6 +14,7 @@ export function TrackTableView({
   queueContext,
   onPlay,
   onRemove,
+  onToggleFavorite,
   onReorderPlaylist,
   renderActions,
 }: {
@@ -20,6 +22,7 @@ export function TrackTableView({
   queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
   onPlay: (row: TrackTableRow, index: number) => void;
   onRemove?: (row: TrackTableRow) => void;
+  onToggleFavorite?: (row: TrackTableRow) => void;
   onReorderPlaylist?: (
     sourcePosition: number,
     destinationPosition: number,
@@ -48,6 +51,15 @@ export function TrackTableView({
             <td>{row.albumName ?? "未知专辑"}</td>
             <td>{row.missingAt === null ? "" : "文件缺失"}</td>
             <td>
+              {onToggleFavorite && row.isFavorite !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => onToggleFavorite(row)}
+                  aria-label={row.isFavorite ? "取消收藏" : "收藏"}
+                >
+                  {row.isFavorite ? "已喜欢" : "喜欢"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onPlay(row, index)}

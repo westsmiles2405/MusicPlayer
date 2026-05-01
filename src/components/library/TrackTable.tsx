@@ -14,6 +14,8 @@ interface TrackTableProps {
     sourcePosition: number,
     destinationPosition: number,
   ) => void;
+  showFavorite?: boolean;
+  onToggleFavorite?: (track: Track, favorite: boolean) => void;
 }
 
 export function TrackTable({
@@ -23,6 +25,8 @@ export function TrackTable({
   onAddToPlaylist,
   onRemoveFromPlaylist,
   onReorderPlaylist,
+  showFavorite,
+  onToggleFavorite,
 }: TrackTableProps) {
   const { play } = usePlayer();
 
@@ -59,6 +63,13 @@ export function TrackTable({
     play(row.id, playableIds, queueIndex >= 0 ? queueIndex : undefined);
   };
 
+  const handleToggleFavorite = onToggleFavorite
+    ? (row: TrackTableRow) => {
+        const track = tracks.find((t) => t.id === row.id);
+        if (track) onToggleFavorite(track, !track.isFavorite);
+      }
+    : undefined;
+
   const rows: TrackTableRow[] = tracks.map((t) => {
     const playlistPosition =
       "playlistPosition" in t
@@ -72,6 +83,7 @@ export function TrackTable({
       durationMs: t.durationMs,
       missingAt: t.missingAt,
       playlistPosition,
+      isFavorite: showFavorite ? t.isFavorite : undefined,
     };
   });
 
@@ -106,6 +118,7 @@ export function TrackTable({
       queueContext={queueContext}
       onPlay={handlePlay}
       onRemove={onRemoveFromPlaylist}
+      onToggleFavorite={handleToggleFavorite}
       onReorderPlaylist={onReorderPlaylist}
       renderActions={renderActions}
     />
