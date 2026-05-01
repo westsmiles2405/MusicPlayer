@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { usePlayer } from "@/hooks/usePlayer";
 import type { Track } from "@/repositories/trackRepo";
 import type { Playlist, PlaylistTrack } from "@/repositories/playlistRepo";
@@ -29,6 +30,9 @@ export function TrackTable({
   onToggleFavorite,
 }: TrackTableProps) {
   const { play } = usePlayer();
+  const [pendingFavoriteIds, setPendingFavoriteIds] = useState<Set<number>>(
+    () => new Set(),
+  );
 
   const playableTracks = tracks.filter((t) => t.missingAt === null);
   const playableIds = playableTracks.map((t) => t.id);
@@ -66,7 +70,18 @@ export function TrackTable({
   const handleToggleFavorite = onToggleFavorite
     ? (row: TrackTableRow) => {
         const track = tracks.find((t) => t.id === row.id);
-        if (track) onToggleFavorite(track, !track.isFavorite);
+        if (!track || pendingFavoriteIds.has(track.id)) return;
+        onToggleFavorite(track, !track.isFavorite);
+        // 如果调用方没有在 mutation 的 onSuccess/onError 里清除 pending，
+        // 这里用乐观超时兜底：2s 后自动移除 pending 状态
+        setPendingFavoriteIds((prev) => new Set(prev).add(track.id));
+        setTimeout(() => {
+          setPendingFavoriteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(track.id);
+            return next;
+          });
+        }, 2000);
       }
     : undefined;
 
@@ -84,6 +99,7 @@ export function TrackTable({
       missingAt: t.missingAt,
       playlistPosition,
       isFavorite: showFavorite ? t.isFavorite : undefined,
+      isFavoritePending: pendingFavoriteIds.has(t.id),
     };
   });
 

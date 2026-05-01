@@ -7,6 +7,7 @@ export interface TrackTableRow {
   missingAt: number | null;
   playlistPosition?: number;
   isFavorite?: boolean;
+  isFavoritePending?: boolean;
 }
 
 export function TrackTableView({
@@ -54,10 +55,15 @@ export function TrackTableView({
               {onToggleFavorite && row.isFavorite !== undefined && (
                 <button
                   type="button"
+                  disabled={row.isFavoritePending}
                   onClick={() => onToggleFavorite(row)}
                   aria-label={row.isFavorite ? "取消收藏" : "收藏"}
                 >
-                  {row.isFavorite ? "已喜欢" : "喜欢"}
+                  {row.isFavoritePending
+                    ? "..."
+                    : row.isFavorite
+                      ? "已喜欢"
+                      : "喜欢"}
                 </button>
               )}
               <button
