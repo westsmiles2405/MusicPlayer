@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { Track } from "@/repositories/trackRepo";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { recentPlayRepo } from "@/repositories/recentPlayRepo";
 import { playlistRepo } from "@/repositories/playlistRepo";
@@ -41,7 +42,7 @@ export default function RecentPlaysPage() {
 
   const tracks = useMemo(
     () =>
-      recentPlays.data?.map(({ lastPlayedAt: _lastPlayedAt, ...track }) => track) ?? [],
+      recentPlays.data?.map(({ lastPlayedAt: _lastPlayedAt, ...track }): Track => track as Track) ?? [],
     [recentPlays.data],
   );
 

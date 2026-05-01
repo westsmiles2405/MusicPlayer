@@ -8,6 +8,10 @@ vi.mock("@/repositories/searchRepo", () => ({
   searchRepo: { search },
 }));
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
+}));
+
 vi.mock("@/repositories/playlistRepo", () => ({
   playlistRepo: {
     list: vi.fn().mockResolvedValue([]),
