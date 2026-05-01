@@ -8,7 +8,7 @@
 
 - **目标平台**：macOS（首发，Mac App Store）+ Web（GitHub Pages）；Windows 推迟到 v1.x。
 - **项目性质**：个人作品集 → 演进为公开发布产品（GitHub 公开，MIT License）。
-- **当前版本**：v0.5.0（资料库浏览 + 播放列表已交付）→ v0.6.0（全局搜索 + 收藏 + 最近播放）。
+- **当前版本**：v0.6.0（全局搜索 + 收藏 + 最近播放已交付）→ v0.7.0（毛玻璃 UI + 键盘快捷键）。
 - **当前阶段**：Phase 1 / v1.0 — **本地音乐播放器**（无后端、无 DRM）。
 - **完整设计**：见 `docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`。
 - **背景调研**：`Apple Music 风格音乐播放器分析报告.pdf`（项目根，14 页）。
@@ -64,13 +64,13 @@
 ```
 MusicPlayer/
 ├── src/                        # React 前端
-│   ├── pages/                  # LibraryPage / SettingsPage（路由 App.tsx）
+│   ├── pages/                  # SearchPage / FavoritesPage / RecentPlaysPage / LibraryPage / SettingsPage（路由 App.tsx）
 │   ├── components/{layout,player,library,ui,effects}/
 │   │   └── layout/ScanProgressBar.tsx   # 全局扫描进度条
 │   ├── stores/                 # Zustand: playerStore / uiStore / prefsStore
-│   ├── hooks/                  # usePlayer (playback_state/track_changed/progress/error 事件) / useScanProgress
+│   ├── hooks/                  # usePlayer (track_changed 时 invalidate recentPlays) / useScanProgress / useToggleFavoriteMutation / useDebouncedValue
 │   ├── repositories/           # ⚠️ 关键解耦层（Phase 2 切 HTTP 时只改这里）
-│   │   └── playerRepo.ts      # player_* Tauri invoke 封装
+│   │   └── playerRepo.ts      # player_* / searchRepo / favoriteRepo / recentPlayRepo
 │   ├── lib/  i18n/  styles/
 │
 ├── src-tauri/                  # Rust 核心
@@ -86,7 +86,7 @@ MusicPlayer/
 │       ├── player/             # ✅ v0.4.0：engine（ringbuf+cpal）/ decoder（symphonia）/ manager（DB解析+事件桥）/ queue（确定性洗牌）/ gapless（后台预解码）/ state（双层命令+会话）
 │       ├── library/            # scanner（walk→reader→indexer 管道）/ watcher（v0.3.1）
 │       ├── metadata/           # reader（lofty + xxh3） / art（封面缓存，内容 hash 去重）
-│       ├── db/                 # tracks / albums / artists / playlists / scan_folders / search / schema
+│       ├── db/                 # tracks（含 list_favorite_tracks）/ albums / artists / playlists（含 search_by_name）/ scan_folders / search（含 search_all 分组搜索）/ play_history（含 list_recent_played_tracks 去重）/ schema
 │       ├── system/now_playing.rs
 │       └── error.rs            # AppError（含 Scan / Busy / Metadata / NotFound）
 │
@@ -113,6 +113,7 @@ MusicPlayer/
 13. **Buffer 背压模型**。`push_samples()` 返回实际写入的样本数；position 仅按已写入样本推进。ringbuf 满时未写入的 chunk 尾部存入 `pending_samples`，下个 tick 优先写入。`flush_pending()` 后若仍有残留 → 跳过 decoder 本 tick。
 14. **Gapless 只在失效路径 cancel**。`finish_session(Stop/Replaced/DecodeError/OutputError/Shutdown)` 取消预解码；`Completed/Next/Previous` 保留结果，供 `advance_next()` 队列推进后消费。
 15. **播放列表允许重复 track ID**。`playlist_tracks` 表支持同一 `track_id` 多次出现。前端计算 queue index 时不能用 `indexOf(id)`（总是返回第一次出现），必须按行在数组中的实际位置做 occurrence-aware 映射。
+16. **收藏乐观更新必须覆盖所有 track-bearing 缓存**。`useToggleFavoriteMutation` 的 `onMutate` 需要同时 patch `favoriteTracks`、`tracks`、`search`、`albumTracks`、`artistTracks`、`recentPlays`；仅在 `onSuccess` 后 `invalidateQueries` 不够——用户会看到"点不上"的延迟。点击行需有 pending 态（disabled + "..."），防止重复点击。
 
 ## 6. 工程规范
 
@@ -137,8 +138,8 @@ MusicPlayer/
 5. ~~播放控制~~ ✅ v0.4.0（播放/暂停/上下首/进度/音量，ringbuf 背压 + pending buffer）
 6. ~~播放队列~~ ✅ v0.4.0（确定性顺序/随机/循环/单曲循环，PlayQueue）
 7. ~~底部 Mini Player~~ ✅ v0.4.0（传输控件/进度条/音量/错误显示）
-8. 全局搜索（FTS5）
-9. 最近播放 + 收藏
+8. ~~全局搜索（FTS5）~~ ✅ v0.6.0（分组搜索：歌曲/专辑/艺人/播放列表，250ms debounce）
+9. ~~最近播放 + 收藏~~ ✅ v0.6.0（收藏乐观更新 + pending 反馈，播放后自动刷新最近播放）
 10. ~~macOS Now Playing 系统集成~~ ✅ v0.4.0（MPNowPlayingInfoCenter + MPRemoteCommandCenter，媒体键/控制中心）
 11. 毛玻璃 UI（系统材质 NSVisualEffectView，Web 端用 backdrop-filter 兜底）
 12. ~~**Gapless 无缝播放**~~ ✅ v0.4.0（后台预解码下一首首个 chunk，<1s 剩余时触发）
@@ -205,6 +206,7 @@ CARGO_TARGET_DIR=/tmp/musicplayer-target cargo check --manifest-path src-tauri/C
 - v0.3.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.3.0-library-scanner.md`
 - v0.4.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.4.0-audio-engine.md`
 - v0.5.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.5.0-library-playlists.md`
+- v0.6.0 实施计划：`docs/superpowers/plans/2026-05-02-v0.6.0-search-favorites-history.md`
 - 调研报告：`Apple Music 风格音乐播放器分析报告.pdf`
 - Tauri 2 文档：https://tauri.app/start/
 - React 19：https://react.dev/
