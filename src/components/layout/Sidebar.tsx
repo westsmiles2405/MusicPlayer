@@ -22,6 +22,18 @@ export function Sidebar() {
           <ul className="sidebar__list">
             <li>
               <NavLink
+                to="/search"
+                className={({ isActive }) =>
+                  isActive
+                    ? "sidebar__link sidebar__link--active"
+                    : "sidebar__link"
+                }
+              >
+                搜索
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
                 to="/library/recent"
                 className={({ isActive }) =>
                   isActive
@@ -66,6 +78,30 @@ export function Sidebar() {
                 }
               >
                 艺人
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/library/favorites"
+                className={({ isActive }) =>
+                  isActive
+                    ? "sidebar__link sidebar__link--active"
+                    : "sidebar__link"
+                }
+              >
+                收藏
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/library/recent-plays"
+                className={({ isActive }) =>
+                  isActive
+                    ? "sidebar__link sidebar__link--active"
+                    : "sidebar__link"
+                }
+              >
+                最近播放
               </NavLink>
             </li>
           </ul>
