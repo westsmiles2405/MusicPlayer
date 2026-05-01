@@ -83,11 +83,19 @@ pub struct AudioProducer {
 }
 
 impl AudioProducer {
-    pub fn push_samples(&self, samples: &[f32]) {
+    /// Push samples into the ring buffer. Returns how many samples were
+    /// actually accepted (stops on first full-buffer rejection so we never
+    /// silently drop samples while advancing position).
+    pub fn push_samples(&self, samples: &[f32]) -> usize {
         let mut prod = self.producer.lock();
+        let mut pushed = 0;
         for &s in samples {
-            let _ = (*prod).try_push(s);
+            if (*prod).try_push(s).is_err() {
+                break;
+            }
+            pushed += 1;
         }
+        pushed
     }
 }
 
@@ -608,10 +616,22 @@ impl AudioEngine {
             for _ in 0..4 {
                 match decoder.read_chunk(4096) {
                     Ok(Some(chunk)) => {
-                        self.producer.push_samples(&chunk.samples);
-                        self.snapshot.position_ms = chunk.start_ms + chunk.duration_ms;
+                        let total = chunk.samples.len();
+                        let pushed = self.producer.push_samples(&chunk.samples);
+                        // Advance position only by samples that actually landed
+                        // in the buffer (stereo = 2 channels, 48k rate).
+                        let pushed_frames = (pushed / 2) as u64;
+                        let pushed_duration_ms =
+                            (pushed_frames * 1000 / 48_000) as i64;
+                        self.snapshot.position_ms =
+                            chunk.start_ms + pushed_duration_ms;
                         if let Some(ref mut session) = self.session {
                             session.mark_position(self.snapshot.position_ms);
+                        }
+                        // Buffer full — stop decoding this tick so audio device
+                        // has time to drain. Resume on the next tick.
+                        if pushed < total {
+                            break;
                         }
                     }
                     Ok(None) => {
@@ -728,4 +748,3 @@ mod tests {
         attempts == 0
     }
 }
-

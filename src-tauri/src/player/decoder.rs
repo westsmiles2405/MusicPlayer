@@ -94,9 +94,7 @@ impl DecodedTrack {
             let packet = match self.format.next_packet() {
                 Ok(packet) => packet,
                 Err(SymphoniaError::IoError(_)) => return Ok(None),
-                Err(e) => {
-                    return Err(AppError::Playback(format!("packet read failed: {e}")))
-                }
+                Err(e) => return Err(AppError::Playback(format!("packet read failed: {e}"))),
             };
             if packet.track_id() != self.track_id {
                 continue;
@@ -327,8 +325,7 @@ pub fn linear_resample(
     }
     let channels = channels as usize;
     let in_frames = samples.len() / channels;
-    let out_frames =
-        ((in_frames as u64 * output_rate as u64) / source_rate as u64).max(1) as usize;
+    let out_frames = ((in_frames as u64 * output_rate as u64) / source_rate as u64).max(1) as usize;
     let mut out = vec![0.0; out_frames * channels];
     for out_frame in 0..out_frames {
         let src_pos = out_frame as f64 * source_rate as f64 / output_rate as f64;
