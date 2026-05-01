@@ -13,7 +13,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 vi.mock("@/hooks/usePlayer", () => ({ usePlayer: () => ({ toggle }) }));
 vi.mock("react-router", async (orig) => {
-  const actual = await orig();
+  const actual: Record<string, unknown> = await orig();
   return { ...actual, useNavigate: () => navigate };
 });
 
