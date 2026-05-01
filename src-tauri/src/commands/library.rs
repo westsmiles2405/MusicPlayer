@@ -82,6 +82,22 @@ pub async fn get_artists(db: State<'_, Database>) -> AppResult<Vec<artists::Arti
 }
 
 #[tauri::command]
+pub async fn get_album(
+    db: State<'_, Database>,
+    album_id: i64,
+) -> AppResult<Option<albums::AlbumView>> {
+    db.with_conn(|c| albums::get_by_id(c, album_id))
+}
+
+#[tauri::command]
+pub async fn get_artist(
+    db: State<'_, Database>,
+    artist_id: i64,
+) -> AppResult<Option<artists::Artist>> {
+    db.with_conn(|c| artists::get_by_id(c, artist_id))
+}
+
+#[tauri::command]
 pub async fn get_album_tracks(
     db: State<'_, Database>,
     album_id: i64,

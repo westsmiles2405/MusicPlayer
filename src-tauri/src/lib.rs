@@ -60,6 +60,8 @@ pub fn run() {
             commands::library::get_tracks,
             commands::library::get_albums,
             commands::library::get_artists,
+            commands::library::get_album,
+            commands::library::get_artist,
             commands::library::get_album_tracks,
             commands::library::get_artist_tracks,
             commands::library::get_recently_added,
