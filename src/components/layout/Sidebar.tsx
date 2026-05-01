@@ -1,8 +1,14 @@
+import { useState } from "react";
 import { NavLink } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { playlistRepo } from "@/repositories/playlistRepo";
+import { useCreatePlaylistMutation } from "@/hooks/useCreatePlaylistMutation";
+import { PlaylistCreateDialog } from "@/components/playlists";
 
 export function Sidebar() {
+  const [createOpen, setCreateOpen] = useState(false);
+  const createMutation = useCreatePlaylistMutation();
+
   const playlists = useQuery({
     queryKey: ["playlists"],
     queryFn: () => playlistRepo.list(),
@@ -66,7 +72,17 @@ export function Sidebar() {
         </section>
 
         <section className="sidebar__section">
-          <h3 className="sidebar__heading">播放列表</h3>
+          <h3 className="sidebar__heading">
+            播放列表
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              aria-label="创建播放列表"
+              className="sidebar__create-btn"
+            >
+              创建
+            </button>
+          </h3>
           <ul className="sidebar__list">
             <li>
               <NavLink
@@ -116,6 +132,14 @@ export function Sidebar() {
           </ul>
         </section>
       </nav>
+
+      <PlaylistCreateDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={async (name) => {
+          await createMutation.mutateAsync(name);
+        }}
+      />
     </aside>
   );
 }

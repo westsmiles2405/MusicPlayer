@@ -13,12 +13,17 @@ export function TrackTableView({
   queueContext,
   onPlay,
   onRemove,
+  onReorderPlaylist,
   renderActions,
 }: {
   rows: TrackTableRow[];
   queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
   onPlay: (row: TrackTableRow) => void;
   onRemove?: (row: TrackTableRow) => void;
+  onReorderPlaylist?: (
+    sourcePosition: number,
+    destinationPosition: number,
+  ) => void;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
 }) {
   return (
@@ -52,6 +57,37 @@ export function TrackTableView({
                 播放
               </button>
               {renderActions?.(row)}
+              {onReorderPlaylist &&
+                row.playlistPosition !== undefined && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={row.playlistPosition <= 0}
+                      onClick={() =>
+                        onReorderPlaylist(
+                          row.playlistPosition!,
+                          row.playlistPosition! - 1,
+                        )
+                      }
+                      aria-label="上移"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      disabled={row.playlistPosition >= rows.length - 1}
+                      onClick={() =>
+                        onReorderPlaylist(
+                          row.playlistPosition!,
+                          row.playlistPosition! + 1,
+                        )
+                      }
+                      aria-label="下移"
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
               {onRemove && (
                 <button type="button" onClick={() => onRemove(row)}>
                   移除

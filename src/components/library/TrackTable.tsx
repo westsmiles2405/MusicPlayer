@@ -8,8 +8,12 @@ interface TrackTableProps {
   tracks: Track[];
   queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
   playlists?: Playlist[];
-  onAddToPlaylist?: (track: Track, playlistId: number) => Promise<void>;
+  onAddToPlaylist?: (track: Track, playlistId: number) => Promise<unknown>;
   onRemoveFromPlaylist?: (track: TrackTableRow) => void;
+  onReorderPlaylist?: (
+    sourcePosition: number,
+    destinationPosition: number,
+  ) => void;
 }
 
 export function TrackTable({
@@ -18,6 +22,7 @@ export function TrackTable({
   playlists,
   onAddToPlaylist,
   onRemoveFromPlaylist,
+  onReorderPlaylist,
 }: TrackTableProps) {
   const { play } = usePlayer();
 
@@ -76,6 +81,7 @@ export function TrackTable({
       queueContext={queueContext}
       onPlay={handlePlay}
       onRemove={onRemoveFromPlaylist}
+      onReorderPlaylist={onReorderPlaylist}
       renderActions={renderActions}
     />
   );
