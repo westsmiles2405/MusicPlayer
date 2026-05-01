@@ -32,6 +32,14 @@ export const playlistRepo = {
     invoke<number>("add_to_playlist", { playlistId, trackId }),
   removeTrack: (playlistId: number, trackId: number, position: number) =>
     invoke<void>("remove_from_playlist", { playlistId, trackId, position }),
-  reorder: (playlistId: number, sourcePosition: number, destinationPosition: number) =>
-    invoke<void>("reorder_playlist", { playlistId, sourcePosition, destinationPosition }),
+  reorder: (
+    playlistId: number,
+    sourcePosition: number,
+    destinationPosition: number,
+  ) =>
+    invoke<void>("reorder_playlist", {
+      playlistId,
+      sourcePosition,
+      destinationPosition,
+    }),
 };

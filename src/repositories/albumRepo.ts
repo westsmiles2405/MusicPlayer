@@ -14,6 +14,5 @@ export interface Album {
 
 export const albumRepo = {
   list: () => invoke<Album[]>("get_albums"),
-  get: (albumId: number) =>
-    invoke<Album | null>("get_album", { albumId }),
+  get: (albumId: number) => invoke<Album | null>("get_album", { albumId }),
 };

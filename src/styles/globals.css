@@ -150,3 +150,62 @@ body,
     grid-area: volume;
   }
 }
+
+/* ── Shared library components ───────────────────────────────── */
+
+.cover-art {
+  display: block;
+  flex: none;
+  object-fit: cover;
+  background: #d8d8de;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+.cover-art--sm { width: 40px; height: 40px; border-radius: 6px; }
+.cover-art--md { width: 96px; height: 96px; border-radius: 8px; }
+.cover-art--lg { width: 176px; height: 176px; border-radius: 10px; }
+
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+.album-grid__item {
+  cursor: pointer;
+  text-align: center;
+}
+.album-grid__item:hover { opacity: 0.8; }
+
+.artist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.artist-list__item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.artist-list__item:hover { background: rgba(0, 0, 0, 0.04); }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--color-muted, #9a9a9a);
+}
+.state h2 { font-size: 18px; margin: 0 0 8px; color: CanvasText; }
