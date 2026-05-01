@@ -1,0 +1,95 @@
+{
+  "app": {
+    "name": "MusicPlayer"
+  },
+  "sidebar": {
+    "library": "Library",
+    "recentlyAdded": "Recently Added",
+    "artists": "Artists",
+    "albums": "Albums",
+    "songs": "Songs",
+    "search": "Search",
+    "favorites": "Favorites",
+    "recentPlays": "Recently Played",
+    "playlists": "Playlists",
+    "allPlaylists": "All Playlists",
+    "create": "Create",
+    "settings": "Settings",
+    "other": "Other"
+  },
+  "player": {
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next",
+    "previous": "Previous",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "notPlaying": "Not Playing",
+    "progress": "Playback Progress",
+    "volume": "Volume"
+  },
+  "nowPlaying": {
+    "title": "Now Playing",
+    "close": "Close Now Playing",
+    "empty": "Nothing Playing"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search songs, albums, artists, or playlists",
+    "startTitle": "Start Searching",
+    "startDesc": "Enter keywords to search songs, albums, artists, or playlists",
+    "searching": "Searching",
+    "failed": "Search Failed",
+    "tracks": "Songs",
+    "albums": "Albums",
+    "artists": "Artists",
+    "playlists": "Playlists",
+    "noTracks": "No matching songs",
+    "noAlbums": "No matching albums",
+    "noArtists": "No matching artists",
+    "noPlaylists": "No matching playlists"
+  },
+  "favorites": {
+    "title": "Favorites",
+    "loading": "Loading",
+    "failed": "Failed to load",
+    "emptyTitle": "No favorite songs yet",
+    "emptyDesc": "Mark songs as favorite from tracks, albums, artists, or search results"
+  },
+  "recentPlays": {
+    "title": "Recently Played",
+    "loading": "Loading",
+    "failed": "Failed to load",
+    "emptyTitle": "No recent plays yet",
+    "emptyDesc": "Play any song and it will appear here"
+  },
+  "playlist": {
+    "rename": "Rename Playlist",
+    "delete": "Delete Playlist",
+    "create": "Create Playlist",
+    "name": "Playlist Name",
+    "cancel": "Cancel",
+    "confirm": "Rename",
+    "deleteConfirm": "Delete",
+    "addTo": "Add to...",
+    "selectPlaylist": "Select Playlist"
+  },
+  "track": {
+    "title": "Title",
+    "artist": "Artist",
+    "album": "Album",
+    "status": "Status",
+    "actions": "Actions",
+    "missing": "Missing",
+    "unknownArtist": "Unknown Artist",
+    "unknownAlbum": "Unknown Album",
+    "favorite": "Favorite",
+    "unfavorite": "Unfavorite",
+    "liked": "Liked",
+    "like": "Like",
+    "pending": "...",
+    "remove": "Remove",
+    "moveUp": "Move Up",
+    "moveDown": "Move Down"
+  }
+}
