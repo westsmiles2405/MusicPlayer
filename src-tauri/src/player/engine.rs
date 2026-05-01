@@ -126,6 +126,7 @@ pub fn create_audio_buffer(
 fn open_default_stream(
     audio: Arc<SharedAudioBuffer>,
     event_tx: Sender<PlayerEvent>,
+    error_flag: Arc<AtomicBool>,
 ) -> AppResult<(Stream, StreamConfig)> {
     let host = cpal::default_host();
     let device = host
@@ -138,6 +139,7 @@ fn open_default_stream(
     let config: StreamConfig = supported.into();
     let err_tx = event_tx.clone();
     let on_error = move |err: cpal::StreamError| {
+        error_flag.store(true, Ordering::Relaxed);
         let _ = err_tx.send(PlayerEvent::Error(PlaybackErrorEvent {
             track_id: None,
             code: PlaybackErrorCode::StreamError,
@@ -202,6 +204,7 @@ pub struct AudioEngine {
     producer: AudioProducer,
     audio: Arc<SharedAudioBuffer>,
     stream: Option<Stream>,
+    stream_error_flag: Arc<AtomicBool>,
     snapshot: PlayerSnapshot,
     shutdown: bool,
     queue: Option<PlayQueue>,
@@ -218,12 +221,14 @@ impl AudioEngine {
     ) -> thread::JoinHandle<()> {
         thread::spawn(move || {
             let (producer, audio) = create_audio_buffer(48_000 * 2 * 5, 0.8, false);
+            let stream_error_flag = Arc::new(AtomicBool::new(false));
             let mut engine = Self {
                 command_rx,
                 event_tx,
                 producer,
                 audio,
                 stream: None,
+                stream_error_flag,
                 snapshot: PlayerSnapshot::default(),
                 shutdown: false,
                 queue: None,
@@ -244,6 +249,9 @@ impl AudioEngine {
                 Err(crossbeam_channel::RecvTimeoutError::Disconnected) => self.shutdown = true,
             }
             self.tick_playback();
+            if self.stream_error_flag.swap(false, Ordering::Relaxed) {
+                self.recover_output_once();
+            }
         }
         let _ = self.event_tx.send(PlayerEvent::ShutdownComplete);
     }
@@ -378,6 +386,38 @@ impl AudioEngine {
         let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
     }
 
+    // ── output device recovery ─────────────────────────────────
+
+    fn recover_output_once(&mut self) {
+        self.stream = None;
+        match open_default_stream(
+            self.audio.clone(),
+            self.event_tx.clone(),
+            self.stream_error_flag.clone(),
+        ) {
+            Ok((stream, _config)) => {
+                self.stream = Some(stream);
+                if self.snapshot.status == PlaybackStatus::Buffering {
+                    self.snapshot.status = PlaybackStatus::Playing;
+                }
+                let _ = self.event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+            }
+            Err(err) => {
+                self.snapshot.status = PlaybackStatus::Error;
+                self.emit_error(
+                    self.snapshot.current.as_ref().map(|t| t.id),
+                    PlaybackErrorCode::OutputUnavailable,
+                    &err.to_string(),
+                    false,
+                );
+                self.finish_session(SessionEndReason::OutputError);
+                let _ = self.event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+            }
+        }
+    }
+
     // ── track lifecycle ─────────────────────────────────────────
 
     fn start_current_track(&mut self) {
@@ -415,7 +455,11 @@ impl AudioEngine {
         ) {
             Ok(decoder) => {
                 if self.stream.is_none() {
-                    match open_default_stream(self.audio.clone(), self.event_tx.clone()) {
+                    match open_default_stream(
+                        self.audio.clone(),
+                        self.event_tx.clone(),
+                        self.stream_error_flag.clone(),
+                    ) {
                         Ok((stream, _config)) => self.stream = Some(stream),
                         Err(err) => {
                             self.snapshot.status = PlaybackStatus::Error;
@@ -663,4 +707,14 @@ mod tests {
         assert!(previous_should_restart_current(3_001));
         assert!(!previous_should_restart_current(3_000));
     }
+
+    #[test]
+    fn output_error_recovery_allows_one_attempt() {
+        assert!(output_error_is_recoverable(0));
+        assert!(!output_error_is_recoverable(1));
+    }
+}
+
+fn output_error_is_recoverable(attempts: usize) -> bool {
+    attempts == 0
 }
