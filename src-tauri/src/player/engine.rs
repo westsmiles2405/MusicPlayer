@@ -2,6 +2,7 @@
 //! PCM decoded in engine thread, pushed to ringbuf Producer.
 //! cpal callback reads from ringbuf Consumer via try_lock — never blocks.
 
+use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc,
@@ -17,16 +18,14 @@ use ringbuf::traits::{Consumer as _, Producer as _, Split};
 use ringbuf::{HeapCons, HeapProd, HeapRb};
 
 use crate::error::{AppError, AppResult};
+use crate::player::decoder::DecodedTrack;
+use crate::player::queue::{PlayQueue, QueueMove};
 use crate::player::state::{
-    EngineCommand, PlaybackErrorCode, PlaybackErrorEvent, PlaybackStatus, PlayerEvent,
-    PlayerSnapshot,
+    now_ms, EngineCommand, EngineTrack, NowPlayingTrack, PlaybackErrorCode, PlaybackErrorEvent,
+    PlaybackSession, PlaybackStatus, PlayerEvent, PlayerSnapshot, SessionEndReason,
 };
 
 // ── SharedAudioBuffer ───────────────────────────────────────────
-//
-// Producer side: engine thread pushes decoded PCM.
-// Consumer side: cpal callback pops via try_lock() — if lock is
-// contended (buffer being cleared) the callback writes silence.
 
 pub struct SharedAudioBuffer {
     consumer: Mutex<HeapCons<f32>>,
@@ -195,7 +194,7 @@ fn fill_output_u16(audio: &SharedAudioBuffer, output: &mut [u16]) {
     }
 }
 
-// ── AudioEngine skeleton ────────────────────────────────────────
+// ── AudioEngine ─────────────────────────────────────────────────
 
 pub struct AudioEngine {
     command_rx: Receiver<EngineCommand>,
@@ -205,11 +204,10 @@ pub struct AudioEngine {
     stream: Option<Stream>,
     snapshot: PlayerSnapshot,
     shutdown: bool,
-    // playback fields added in Task 7
-    queue: Option<crate::player::queue::PlayQueue>,
-    tracks: Vec<crate::player::state::EngineTrack>,
-    decoder: Option<crate::player::decoder::DecodedTrack>,
-    session: Option<crate::player::state::PlaybackSession>,
+    queue: Option<PlayQueue>,
+    tracks: Vec<EngineTrack>,
+    decoder: Option<DecodedTrack>,
+    session: Option<PlaybackSession>,
     last_tick: Instant,
 }
 
@@ -252,6 +250,44 @@ impl AudioEngine {
 
     fn handle_command(&mut self, command: EngineCommand) {
         match command {
+            EngineCommand::LoadQueueAndPlay { tracks, index } => {
+                self.finish_session(SessionEndReason::Replaced);
+                self.tracks = tracks;
+                self.queue = Some(
+                    PlayQueue::from_tracks(
+                        self.tracks.iter().map(|t| t.id).collect(),
+                        index,
+                    )
+                    .unwrap(),
+                );
+                self.start_current_track();
+            }
+            EngineCommand::Pause => self.pause(),
+            EngineCommand::Resume => self.resume(),
+            EngineCommand::Toggle => {
+                if self.snapshot.status == PlaybackStatus::Playing {
+                    self.pause();
+                } else if self.snapshot.status == PlaybackStatus::Paused {
+                    self.resume();
+                }
+            }
+            EngineCommand::Stop => self.stop(),
+            EngineCommand::Seek { position_ms } => {
+                let target = clamp_seek(position_ms, self.snapshot.duration_ms);
+                self.seek_to(target);
+            }
+            EngineCommand::Next => {
+                self.finish_session(SessionEndReason::Next);
+                self.advance_next();
+            }
+            EngineCommand::Previous => {
+                if previous_should_restart_current(self.snapshot.position_ms) {
+                    self.seek_to(0);
+                } else {
+                    self.finish_session(SessionEndReason::Previous);
+                    self.go_previous();
+                }
+            }
             EngineCommand::SetVolume { volume } => {
                 let volume = volume.clamp(0.0, 1.0);
                 self.audio.set_volume(volume);
@@ -269,36 +305,317 @@ impl AudioEngine {
                 self.snapshot.muted = muted;
                 let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
-            EngineCommand::Stop => self.stop(),
             EngineCommand::Shutdown => {
                 self.stop();
                 self.shutdown = true;
             }
-            _ => {} // LoadQueueAndPlay, Pause, Resume, Toggle, Seek, Next, Previous handled in Task 7
         }
     }
 
-    fn stop(&mut self) {
+    // ── pause / resume / seek ──────────────────────────────────
+
+    fn pause(&mut self) {
+        if self.snapshot.status == PlaybackStatus::Playing {
+            self.snapshot.status = PlaybackStatus::Paused;
+            let _ = self.event_tx
+                .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+        }
+    }
+
+    fn resume(&mut self) {
+        if self.snapshot.status == PlaybackStatus::Paused {
+            self.snapshot.status = PlaybackStatus::Playing;
+            self.last_tick = Instant::now();
+            let _ = self.event_tx
+                .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+        }
+    }
+
+    fn seek_to(&mut self, target_ms: i64) {
+        let was_paused = self.snapshot.status == PlaybackStatus::Paused;
+        self.snapshot.status = PlaybackStatus::Buffering;
+        let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
         self.audio.clear();
-        self.stream = None;
-        self.decoder = None;
-        self.snapshot.status = PlaybackStatus::Stopped;
-        self.snapshot.position_ms = 0;
+        if let Some(ref mut decoder) = self.decoder {
+            match decoder.seek_ms(target_ms) {
+                Ok(pos) => {
+                    self.snapshot.position_ms = pos;
+                    if let Some(ref mut session) = self.session {
+                        session.mark_position(pos);
+                    }
+                }
+                Err(e) => {
+                    self.emit_error(
+                        self.snapshot.current.as_ref().map(|t| t.id),
+                        PlaybackErrorCode::DecodeFailed,
+                        &e.to_string(),
+                        true,
+                    );
+                }
+            }
+        }
+        self.snapshot.status = if was_paused {
+            PlaybackStatus::Paused
+        } else {
+            PlaybackStatus::Playing
+        };
+        self.last_tick = Instant::now();
         let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
     }
 
-    /// Stub — full implementation in Task 7.
-    fn tick_playback(&mut self) {
-        // Placeholder: push silence/progress when active
+    fn stop(&mut self) {
+        self.finish_session(SessionEndReason::Stop);
+        self.audio.clear();
+        self.stream = None;
+        self.decoder = None;
+        self.queue = None;
+        self.tracks.clear();
+        self.snapshot.status = PlaybackStatus::Stopped;
+        self.snapshot.position_ms = 0;
+        self.snapshot.current = None;
+        self.snapshot.queue_index = None;
+        self.snapshot.queue_len = 0;
+        let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
     }
 
-    fn emit_error(&self, track_id: Option<i64>, code: PlaybackErrorCode, message: &str, recoverable: bool) {
+    // ── track lifecycle ─────────────────────────────────────────
+
+    fn start_current_track(&mut self) {
+        let Some(track_id) = self.queue.as_ref().and_then(|q| q.current()) else {
+            self.snapshot.status = PlaybackStatus::Ended;
+            let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+            return;
+        };
+        let Some(track) = self.tracks.iter().find(|t| t.id == track_id).cloned() else {
+            self.emit_error(
+                Some(track_id),
+                PlaybackErrorCode::FileNotFound,
+                "track metadata missing",
+                true,
+            );
+            self.skip_unplayable_current();
+            return;
+        };
+        if track.missing_at.is_some() {
+            self.emit_error(
+                Some(track.id),
+                PlaybackErrorCode::FileNotFound,
+                "track is marked missing",
+                true,
+            );
+            self.skip_unplayable_current();
+            return;
+        }
+        let output_rate = 48_000;
+        let output_channels = 2;
+        match DecodedTrack::open(
+            PathBuf::from(&track.file_path).as_path(),
+            output_rate,
+            output_channels,
+        ) {
+            Ok(decoder) => {
+                if self.stream.is_none() {
+                    match open_default_stream(self.audio.clone(), self.event_tx.clone()) {
+                        Ok((stream, _config)) => self.stream = Some(stream),
+                        Err(err) => {
+                            self.snapshot.status = PlaybackStatus::Error;
+                            self.emit_error(
+                                Some(track.id),
+                                PlaybackErrorCode::OutputUnavailable,
+                                &err.to_string(),
+                                false,
+                            );
+                            let _ = self.event_tx
+                                .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                            return;
+                        }
+                    }
+                }
+                self.decoder = Some(decoder);
+                self.audio.clear();
+                let session = PlaybackSession::new(track.id, now_ms());
+                self.session = Some(session);
+                self.snapshot.status = PlaybackStatus::Playing;
+                self.snapshot.current = Some(NowPlayingTrack::from(track));
+                self.snapshot.position_ms = 0;
+                self.snapshot.duration_ms = self
+                    .tracks
+                    .iter()
+                    .find(|t| t.id == track_id)
+                    .map(|t| t.duration_ms)
+                    .unwrap_or(0);
+                self.snapshot.queue_index = self.queue.as_ref().and_then(|q| q.current_index());
+                self.snapshot.queue_len = self.queue.as_ref().map(|q| q.len()).unwrap_or(0);
+                self.last_tick = Instant::now();
+                let _ = self.event_tx
+                    .send(PlayerEvent::TrackChanged(self.snapshot.current.clone()));
+                let _ = self.event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+            }
+            Err(err) => {
+                self.emit_error(
+                    Some(track.id),
+                    classify_decode_error(&err),
+                    &err.to_string(),
+                    true,
+                );
+                self.skip_unplayable_current();
+            }
+        }
+    }
+
+    fn finish_session(&mut self, reason: SessionEndReason) {
+        if let Some(session) = self.session.take() {
+            let _ = self.event_tx.send(PlayerEvent::SessionEnded {
+                session,
+                duration_ms: self.snapshot.duration_ms,
+                reason,
+            });
+        }
+    }
+
+    fn advance_next(&mut self) {
+        self.decoder = None;
+        self.audio.clear();
+        if let Some(ref mut q) = self.queue {
+            match q.next() {
+                QueueMove::Track(_) => {
+                    self.start_current_track();
+                }
+                QueueMove::RestartCurrent(_) => {
+                    self.start_current_track();
+                }
+                QueueMove::Ended => {
+                    self.snapshot.status = PlaybackStatus::Ended;
+                    self.snapshot.current = None;
+                    let _ = self.event_tx
+                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                }
+            }
+        }
+    }
+
+    fn go_previous(&mut self) {
+        self.decoder = None;
+        self.audio.clear();
+        if let Some(ref mut q) = self.queue {
+            match q.previous() {
+                QueueMove::Track(_) => {
+                    self.start_current_track();
+                }
+                QueueMove::RestartCurrent(_) => {
+                    self.start_current_track();
+                }
+                QueueMove::Ended => {
+                    self.snapshot.status = PlaybackStatus::Ended;
+                    self.snapshot.current = None;
+                    let _ = self.event_tx
+                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                }
+            }
+        }
+    }
+
+    fn skip_unplayable_current(&mut self) {
+        self.decoder = None;
+        self.audio.clear();
+        if let Some(ref mut q) = self.queue {
+            match q.remove_current_unplayable() {
+                QueueMove::Track(_) => {
+                    self.start_current_track();
+                }
+                QueueMove::RestartCurrent(_) => {
+                    self.start_current_track();
+                }
+                QueueMove::Ended => {
+                    self.snapshot.status = PlaybackStatus::Ended;
+                    self.snapshot.current = None;
+                    let _ = self.event_tx
+                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                }
+            }
+        }
+    }
+
+    // ── tick ────────────────────────────────────────────────────
+
+    fn tick_playback(&mut self) {
+        if self.snapshot.status != PlaybackStatus::Playing {
+            self.last_tick = Instant::now();
+            return;
+        }
+        let elapsed = self.last_tick.elapsed();
+        self.last_tick = Instant::now();
+        let delta_ms = elapsed.as_millis() as i64;
+        if let Some(ref mut session) = self.session {
+            session.add_real_played_ms(delta_ms);
+        }
+        if let Some(ref mut decoder) = self.decoder {
+            for _ in 0..4 {
+                match decoder.read_chunk(4096) {
+                    Ok(Some(chunk)) => {
+                        self.producer.push_samples(&chunk.samples);
+                        self.snapshot.position_ms = chunk.start_ms + chunk.duration_ms;
+                        if let Some(ref mut session) = self.session {
+                            session.mark_position(self.snapshot.position_ms);
+                        }
+                    }
+                    Ok(None) => {
+                        self.finish_session(SessionEndReason::Completed);
+                        self.advance_next();
+                        break;
+                    }
+                    Err(err) => {
+                        self.emit_error(
+                            self.snapshot.current.as_ref().map(|t| t.id),
+                            classify_decode_error(&err),
+                            &err.to_string(),
+                            true,
+                        );
+                        self.finish_session(SessionEndReason::DecodeError);
+                        self.skip_unplayable_current();
+                        break;
+                    }
+                }
+            }
+        }
+        let _ = self.event_tx.send(PlayerEvent::Progress {
+            position_ms: self.snapshot.position_ms,
+            duration_ms: self.snapshot.duration_ms,
+        });
+    }
+
+    fn emit_error(
+        &self,
+        track_id: Option<i64>,
+        code: PlaybackErrorCode,
+        message: &str,
+        recoverable: bool,
+    ) {
         let _ = self.event_tx.send(PlayerEvent::Error(PlaybackErrorEvent {
             track_id,
             code,
             message: message.into(),
             recoverable,
         }));
+    }
+}
+
+// ── helpers ─────────────────────────────────────────────────────
+
+fn clamp_seek(position_ms: i64, duration_ms: i64) -> i64 {
+    position_ms.clamp(0, duration_ms.max(0))
+}
+
+fn previous_should_restart_current(position_ms: i64) -> bool {
+    position_ms > 3_000
+}
+
+fn classify_decode_error(err: &AppError) -> PlaybackErrorCode {
+    match err {
+        AppError::FileNotFound(_) => PlaybackErrorCode::FileNotFound,
+        AppError::PermissionDenied(_) => PlaybackErrorCode::PermissionDenied,
+        _ => PlaybackErrorCode::DecodeFailed,
     }
 }
 
@@ -329,5 +646,21 @@ mod tests {
         audio.set_muted(true);
         audio.fill_output_f32(&mut out);
         assert_eq!(out, [0.0, 0.0]);
+    }
+
+    #[test]
+    fn seek_clamps_negative_to_zero() {
+        assert_eq!(clamp_seek(-10, 100_000), 0);
+    }
+
+    #[test]
+    fn seek_clamps_after_duration_to_duration() {
+        assert_eq!(clamp_seek(120_000, 100_000), 100_000);
+    }
+
+    #[test]
+    fn previous_restarts_when_position_over_three_seconds() {
+        assert!(previous_should_restart_current(3_001));
+        assert!(!previous_should_restart_current(3_000));
     }
 }
