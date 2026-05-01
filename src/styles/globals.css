@@ -380,3 +380,49 @@ body,
   opacity: 0.4;
   cursor: default;
 }
+
+/* ── App Shell Layout ─────────────────────────────────────── */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  background: var(--color-apple-bg);
+  color: CanvasText;
+}
+
+.app-shell__main {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 28px 96px;
+}
+
+.sidebar {
+  grid-row: 1 / span 2;
+  min-width: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--color-sidebar) 82%, transparent);
+  backdrop-filter: blur(22px);
+}
+
+.mini-player {
+  grid-column: 2;
+}
+
+/* ── responsive ───────────────────────────────────────────── */
+
+@media (max-width: 760px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    grid-row: auto;
+  }
+
+  .mini-player {
+    grid-column: 1;
+  }
+}
