@@ -8,7 +8,7 @@
 
 - **目标平台**：macOS（首发，Mac App Store）+ Web（GitHub Pages）；Windows 推迟到 v1.x。
 - **项目性质**：个人作品集 → 演进为公开发布产品（GitHub 公开，MIT License）。
-- **当前版本**：v0.4.0（音频引擎已交付）→ v0.5.0（资料库浏览 + 播放列表）。
+- **当前版本**：v0.5.0（资料库浏览 + 播放列表已交付）→ v0.6.0（全局搜索 + 收藏 + 最近播放）。
 - **当前阶段**：Phase 1 / v1.0 — **本地音乐播放器**（无后端、无 DRM）。
 - **完整设计**：见 `docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`。
 - **背景调研**：`Apple Music 风格音乐播放器分析报告.pdf`（项目根，14 页）。
@@ -130,9 +130,9 @@ MusicPlayer/
 ## 7. v1.0 必做功能（不要走偏）
 
 1. ~~本地音乐扫描~~ ✅ v0.3.0（mp3/m4a/flac/wav/aac，递归 + lofty 标签 + xxh3 hash + 封面缓存）
-2. 资料库浏览（侧边栏：资料库 → 最近添加 / 艺人 / 专辑 / 歌曲）
-3. 专辑 / 艺人详情页（封面取色背景）
-4. 用户播放列表（CRUD + 拖拽排序）
+2. ~~资料库浏览~~ ✅ v0.5.0（侧边栏：最近添加 / 歌曲 / 专辑 / 艺人，React Query + TrackTable）
+3. ~~专辑 / 艺人详情页~~ ✅ v0.5.0（详情页含播放按钮，加入播放列表菜单）
+4. ~~用户播放列表~~ ✅ v0.5.0（CRUD 对话框 + 拖拽排序 + 缺失曲目处理）
 5. ~~播放控制~~ ✅ v0.4.0（播放/暂停/上下首/进度/音量，ringbuf 背压 + pending buffer）
 6. ~~播放队列~~ ✅ v0.4.0（确定性顺序/随机/循环/单曲循环，PlayQueue）
 7. ~~底部 Mini Player~~ ✅ v0.4.0（传输控件/进度条/音量/错误显示）
@@ -201,6 +201,7 @@ CARGO_TARGET_DIR=/tmp/musicplayer-target cargo check --manifest-path src-tauri/C
 - v0.3.0 scanner spec：`docs/superpowers/specs/2026-05-01-v0.3.0-library-scanner-design.md`
 - v0.3.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.3.0-library-scanner.md`
 - v0.4.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.4.0-audio-engine.md`
+- v0.5.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.5.0-library-playlists.md`
 - 调研报告：`Apple Music 风格音乐播放器分析报告.pdf`
 - Tauri 2 文档：https://tauri.app/start/
 - React 19：https://react.dev/
