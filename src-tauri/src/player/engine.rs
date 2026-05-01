@@ -316,6 +316,27 @@ impl AudioEngine {
                     .event_tx
                     .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
+            EngineCommand::SetRepeatMode { mode } => {
+                if let Some(ref mut q) = self.queue {
+                    q.set_repeat_mode(mode);
+                    self.snapshot.repeat_mode = mode;
+                    let _ = self
+                        .event_tx
+                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                }
+            }
+            EngineCommand::SetShuffle { enabled } => {
+                if let Some(ref mut q) = self.queue {
+                    q.set_shuffle(enabled);
+                    self.snapshot.shuffle = enabled;
+                    if let Some(idx) = q.current_index() {
+                        self.snapshot.queue_index = Some(idx);
+                    }
+                    let _ = self
+                        .event_tx
+                        .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                }
+            }
             EngineCommand::Shutdown => {
                 self.stop();
                 self.shutdown = true;
@@ -575,10 +596,8 @@ impl AudioEngine {
                 self.audio.clear();
                 self.producer.push_samples(&first_chunk.samples);
                 self.snapshot.status = PlaybackStatus::Playing;
-                self.snapshot.position_ms =
-                    first_chunk.start_ms + first_chunk.duration_ms;
-                let session =
-                    PlaybackSession::new(track_id, now_ms());
+                self.snapshot.position_ms = first_chunk.start_ms + first_chunk.duration_ms;
+                let session = PlaybackSession::new(track_id, now_ms());
                 if let Some(ref mut s) = self.session {
                     *s = session;
                 } else {
@@ -595,10 +614,8 @@ impl AudioEngine {
                     .find(|t| t.id == track_id)
                     .map(|t| t.duration_ms)
                     .unwrap_or(0);
-                self.snapshot.queue_index =
-                    self.queue.as_ref().and_then(|q| q.current_index());
-                self.snapshot.queue_len =
-                    self.queue.as_ref().map(|q| q.len()).unwrap_or(0);
+                self.snapshot.queue_index = self.queue.as_ref().and_then(|q| q.current_index());
+                self.snapshot.queue_len = self.queue.as_ref().map(|q| q.len()).unwrap_or(0);
                 self.last_tick = Instant::now();
                 let _ = self
                     .event_tx
@@ -694,10 +711,8 @@ impl AudioEngine {
                         // Advance position only by samples that actually landed
                         // in the buffer (stereo = 2 channels, 48k rate).
                         let pushed_frames = (pushed / 2) as u64;
-                        let pushed_duration_ms =
-                            (pushed_frames * 1000 / 48_000) as i64;
-                        self.snapshot.position_ms =
-                            chunk.start_ms + pushed_duration_ms;
+                        let pushed_duration_ms = (pushed_frames * 1000 / 48_000) as i64;
+                        self.snapshot.position_ms = chunk.start_ms + pushed_duration_ms;
                         if let Some(ref mut session) = self.session {
                             session.mark_position(self.snapshot.position_ms);
                         }

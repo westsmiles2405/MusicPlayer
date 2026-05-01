@@ -146,12 +146,10 @@ fn spawn_player_command_handler(
                     let _ = engine_tx.send(EngineCommand::ToggleMute);
                 }
                 PlayerCommand::SetRepeatMode { mode } => {
-                    // TODO: wire repeat mode to engine
-                    let _ = mode;
+                    let _ = engine_tx.send(EngineCommand::SetRepeatMode { mode });
                 }
                 PlayerCommand::SetShuffle { enabled } => {
-                    // TODO: wire shuffle to engine
-                    let _ = enabled;
+                    let _ = engine_tx.send(EngineCommand::SetShuffle { enabled });
                 }
                 PlayerCommand::Shutdown => {
                     let _ = engine_tx.send(EngineCommand::Shutdown);

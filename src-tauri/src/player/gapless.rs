@@ -16,6 +16,7 @@ pub struct GaplessRequest {
     pub output_channels: u16,
 }
 
+#[allow(dead_code)]
 pub enum GaplessResult {
     Ready {
         track_id: i64,

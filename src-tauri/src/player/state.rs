@@ -233,6 +233,12 @@ pub enum EngineCommand {
         muted: bool,
     },
     ToggleMute,
+    SetRepeatMode {
+        mode: RepeatMode,
+    },
+    SetShuffle {
+        enabled: bool,
+    },
     Shutdown,
 }
 
