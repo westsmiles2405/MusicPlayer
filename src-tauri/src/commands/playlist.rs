@@ -2,7 +2,7 @@
 
 use tauri::State;
 
-use crate::db::{playlists, tracks, Database};
+use crate::db::{playlists, Database};
 use crate::error::AppResult;
 
 fn now_ms() -> i64 {
@@ -22,7 +22,7 @@ pub async fn get_playlists(db: State<'_, Database>) -> AppResult<Vec<playlists::
 pub async fn get_playlist_tracks(
     db: State<'_, Database>,
     playlist_id: i64,
-) -> AppResult<Vec<tracks::TrackView>> {
+) -> AppResult<Vec<playlists::PlaylistTrackView>> {
     db.with_conn(|c| playlists::get_tracks(c, playlist_id))
 }
 
@@ -72,8 +72,10 @@ pub async fn remove_from_playlist(
 pub async fn reorder_playlist(
     db: State<'_, Database>,
     playlist_id: i64,
-    from_position: i64,
-    to_position: i64,
+    source_position: i64,
+    destination_position: i64,
 ) -> AppResult<()> {
-    db.with_conn(|c| playlists::reorder(c, playlist_id, from_position, to_position))
+    db.with_conn(|c| {
+        playlists::reorder(c, playlist_id, source_position, destination_position)
+    })
 }

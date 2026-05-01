@@ -1,10 +1,9 @@
-#![allow(unused_imports)]
 //! Playlist queries.
 
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use serde::{Deserialize, Serialize};
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,6 +22,46 @@ pub struct PlaylistSummary {
     #[serde(flatten)]
     pub playlist: Playlist,
     pub track_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistTrackView {
+    #[serde(flatten)]
+    pub track: crate::db::tracks::TrackView,
+    pub playlist_position: i64,
+}
+
+fn validate_name(name: &str) -> AppResult<&str> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::InvalidInput(
+            "playlist name cannot be empty".into(),
+        ));
+    }
+    Ok(trimmed)
+}
+
+fn compact_positions(conn: &Connection, playlist_id: i64) -> AppResult<()> {
+    let mut stmt = conn.prepare(
+        "SELECT rowid, position FROM playlist_tracks
+         WHERE playlist_id = ?1
+         ORDER BY position, added_at, rowid",
+    )?;
+    let rows: Vec<(i64, i64)> = stmt
+        .query_map(params![playlist_id], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    drop(stmt);
+
+    for (new_pos, (rowid, _old_pos)) in rows.into_iter().enumerate() {
+        conn.execute(
+            "UPDATE playlist_tracks
+             SET position = ?2
+             WHERE rowid = ?1",
+            params![rowid, new_pos as i64],
+        )?;
+    }
+    Ok(())
 }
 
 impl Playlist {
@@ -44,6 +83,7 @@ pub fn create(
     description: Option<&str>,
     now_ms: i64,
 ) -> AppResult<i64> {
+    let name = validate_name(name)?;
     conn.execute(
         "INSERT INTO playlists (name, description, created_at, updated_at) VALUES (?1, ?2, ?3, ?3)",
         params![name, description, now_ms],
@@ -54,18 +94,19 @@ pub fn create(
 pub fn delete(conn: &Connection, id: i64) -> AppResult<()> {
     let n = conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
     if n == 0 {
-        return Err(crate::error::AppError::NotFound(format!("playlist {id}")));
+        return Err(AppError::NotFound(format!("playlist {id}")));
     }
     Ok(())
 }
 
 pub fn rename(conn: &Connection, id: i64, name: &str, now_ms: i64) -> AppResult<()> {
+    let name = validate_name(name)?;
     let n = conn.execute(
         "UPDATE playlists SET name = ?1, updated_at = ?2 WHERE id = ?3",
         params![name, now_ms, id],
     )?;
     if n == 0 {
-        return Err(crate::error::AppError::NotFound(format!("playlist {id}")));
+        return Err(AppError::NotFound(format!("playlist {id}")));
     }
     Ok(())
 }
@@ -93,7 +134,7 @@ pub fn list(conn: &Connection) -> AppResult<Vec<PlaylistSummary>> {
 pub fn get_tracks(
     conn: &Connection,
     playlist_id: i64,
-) -> AppResult<Vec<crate::db::tracks::TrackView>> {
+) -> AppResult<Vec<PlaylistTrackView>> {
     use crate::db::tracks::{Track, TrackView};
     let mut stmt = conn.prepare(
         "SELECT t.id, t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
@@ -104,7 +145,8 @@ pub fn get_tracks(
                 t.last_seen_at, t.missing_at, t.added_at, t.updated_at,
                 t.root_folder_id,
                 al.name AS album_name,
-                ar.name AS primary_artist_name
+                ar.name AS primary_artist_name,
+                pt.position AS playlist_position
          FROM playlist_tracks pt
          JOIN tracks t ON t.id = pt.track_id
          LEFT JOIN albums al ON al.id = t.album_id
@@ -113,10 +155,13 @@ pub fn get_tracks(
          ORDER BY pt.position",
     )?;
     let rows = stmt.query_map(params![playlist_id], |row| {
-        Ok(TrackView {
-            track: Track::from_row_via_helper(row)?,
-            album_name: row.get("album_name")?,
-            primary_artist_name: row.get("primary_artist_name")?,
+        Ok(PlaylistTrackView {
+            track: TrackView {
+                track: Track::from_row_via_helper(row)?,
+                album_name: row.get("album_name")?,
+                primary_artist_name: row.get("primary_artist_name")?,
+            },
+            playlist_position: row.get("playlist_position")?,
         })
     })?;
     let mut out = Vec::new();
@@ -155,66 +200,81 @@ pub fn remove_track(
         params![playlist_id, track_id, position],
     )?;
     if n == 0 {
-        return Err(crate::error::AppError::NotFound(format!(
+        return Err(AppError::NotFound(format!(
             "playlist_track ({playlist_id},{track_id},pos={position})"
         )));
     }
+    compact_positions(conn, playlist_id)?;
     Ok(())
 }
 
 pub fn reorder(
     conn: &Connection,
     playlist_id: i64,
-    from_position: i64,
-    to_position: i64,
+    source_position: i64,
+    destination_position: i64,
 ) -> AppResult<()> {
-    if from_position == to_position {
-        return Ok(());
-    }
-    let tx = conn.unchecked_transaction()?;
+    compact_positions(conn, playlist_id)?;
 
-    // 取出待移动的 track_id
-    let track_id: i64 = tx
-        .query_row(
-            "SELECT track_id FROM playlist_tracks WHERE playlist_id = ?1 AND position = ?2",
-            params![playlist_id, from_position],
-            |r| r.get(0),
-        )
-        .map_err(|e| match e {
-            rusqlite::Error::QueryReturnedNoRows => crate::error::AppError::NotFound(format!(
-                "playlist {playlist_id} pos {from_position}"
-            )),
-            other => other.into(),
-        })?;
-
-    // 先把它搬到一个不可能冲突的临时位置
-    tx.execute(
-        "UPDATE playlist_tracks SET position = -1 WHERE playlist_id = ?1 AND position = ?2",
-        params![playlist_id, from_position],
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM playlist_tracks WHERE playlist_id = ?1",
+        params![playlist_id],
+        |r| r.get(0),
     )?;
 
-    // 平移中间的行
-    if from_position < to_position {
+    if source_position < 0
+        || destination_position < 0
+        || source_position >= count
+        || destination_position >= count
+    {
+        return Err(AppError::InvalidInput(format!(
+            "reorder out of bounds: {source_position} -> {destination_position} (count={count})"
+        )));
+    }
+
+    if source_position == destination_position {
+        return Ok(());
+    }
+
+    // Select rowid of the moved row
+    let rowid: i64 = conn.query_row(
+        "SELECT rowid FROM playlist_tracks
+         WHERE playlist_id = ?1 AND position = ?2",
+        params![playlist_id, source_position],
+        |r| r.get(0),
+    )?;
+
+    let tx = conn.unchecked_transaction()?;
+
+    // Move to temporary position
+    tx.execute(
+        "UPDATE playlist_tracks SET position = -1 WHERE rowid = ?1",
+        params![rowid],
+    )?;
+
+    // Shift intervening rows
+    if source_position < destination_position {
         tx.execute(
             "UPDATE playlist_tracks SET position = position - 1
              WHERE playlist_id = ?1 AND position > ?2 AND position <= ?3",
-            params![playlist_id, from_position, to_position],
+            params![playlist_id, source_position, destination_position],
         )?;
     } else {
         tx.execute(
             "UPDATE playlist_tracks SET position = position + 1
              WHERE playlist_id = ?1 AND position >= ?2 AND position < ?3",
-            params![playlist_id, to_position, from_position],
+            params![playlist_id, destination_position, source_position],
         )?;
     }
 
-    // 把目标行落到目标位置
+    // Move to destination
     tx.execute(
-        "UPDATE playlist_tracks SET position = ?2 WHERE playlist_id = ?1 AND track_id = ?3 AND position = -1",
-        params![playlist_id, to_position, track_id],
+        "UPDATE playlist_tracks SET position = ?2 WHERE rowid = ?1",
+        params![rowid, destination_position],
     )?;
 
     tx.commit()?;
+    compact_positions(conn, playlist_id)?;
     Ok(())
 }
 
@@ -226,12 +286,12 @@ mod tests {
     fn setup_with_three_tracks(conn: &Connection) -> (i64, [i64; 3]) {
         let pid = create(conn, "Mix", None, 100).unwrap();
         let t1 = testing::make_basic_track(conn, "T1");
-        // T2/T3 必须复用 TestArtist 否则 file_path 冲突；改 path
         let artist = crate::db::artists::find_by_name(conn, "TestArtist")
             .unwrap()
             .unwrap()
             .id;
-        let album = crate::db::albums::upsert(conn, "TestAlbum", artist, Some(2024), 100).unwrap();
+        let album =
+            crate::db::albums::upsert(conn, "TestAlbum", artist, Some(2024), 100).unwrap();
         let mk = |path: &str, title: &str| -> i64 {
             let nt = crate::db::tracks::NewTrack {
                 file_path: path.into(),
@@ -263,6 +323,8 @@ mod tests {
         (pid, [t1, t2, t3])
     }
 
+    // ── original tests preserved ────────────────────────────────
+
     #[test]
     fn create_and_list() {
         let conn = test_db();
@@ -279,48 +341,28 @@ mod tests {
         let conn = test_db();
         let (pid, ids) = setup_with_three_tracks(&conn);
         let positions: Vec<i64> = conn
-            .prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position")
+            .prepare(
+                "SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position",
+            )
             .unwrap()
             .query_map(params![pid], |r| r.get(0))
             .unwrap()
             .map(|r| r.unwrap())
             .collect();
         assert_eq!(positions, vec![0, 1, 2]);
-        // get_tracks 返回顺序也是 0,1,2
         let views = get_tracks(&conn, pid).unwrap();
-        assert_eq!(views[0].track.id, ids[0]);
-        assert_eq!(views[2].track.id, ids[2]);
-    }
-
-    #[test]
-    fn remove_track_keeps_remaining_positions() {
-        let conn = test_db();
-        let (pid, ids) = setup_with_three_tracks(&conn);
-        remove_track(&conn, pid, ids[1], 1).unwrap();
-        let views = get_tracks(&conn, pid).unwrap();
-        assert_eq!(views.len(), 2);
-        // remaining tracks keep their (now possibly non-contiguous) positions: 0, 2
-        // 实现允许"洞"或"压实"二选一 — 此项目选保留洞，append 时按 MAX(position)+1
-        let pos_after: Vec<i64> = conn
-            .prepare("SELECT position FROM playlist_tracks WHERE playlist_id=?1 ORDER BY position")
-            .unwrap()
-            .query_map(params![pid], |r| r.get(0))
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        assert_eq!(pos_after, vec![0, 2]);
+        assert_eq!(views[0].track.track.id, ids[0]);
+        assert_eq!(views[2].track.track.id, ids[2]);
     }
 
     #[test]
     fn reorder_moves_row_and_shifts_others() {
         let conn = test_db();
         let (pid, ids) = setup_with_three_tracks(&conn);
-        // 把第 0 行（T1）移到第 2 行：结果应该是 T2, T3, T1
         reorder(&conn, pid, 0, 2).unwrap();
         let views = get_tracks(&conn, pid).unwrap();
-        let titles: Vec<&str> = views.iter().map(|v| v.track.title.as_str()).collect();
+        let titles: Vec<&str> = views.iter().map(|v| v.track.track.title.as_str()).collect();
         assert_eq!(titles, vec!["T2", "T3", "T1"]);
-        // 反过来：T1 移回首位
         let new_t1_pos = conn
             .query_row(
                 "SELECT position FROM playlist_tracks WHERE playlist_id=?1 AND track_id=?2",
@@ -330,7 +372,7 @@ mod tests {
             .unwrap();
         reorder(&conn, pid, new_t1_pos, 0).unwrap();
         let views = get_tracks(&conn, pid).unwrap();
-        let titles: Vec<&str> = views.iter().map(|v| v.track.title.as_str()).collect();
+        let titles: Vec<&str> = views.iter().map(|v| v.track.track.title.as_str()).collect();
         assert_eq!(titles, vec!["T1", "T2", "T3"]);
     }
 
@@ -362,5 +404,85 @@ mod tests {
             )
             .unwrap();
         assert_eq!(n, "New");
+    }
+
+    // ── new v0.5.0 tests ────────────────────────────────────────
+
+    #[test]
+    fn create_rejects_empty_name_after_trim() {
+        let conn = test_db();
+        let err = create(&conn, "   ", None, 100).unwrap_err();
+        assert!(matches!(err, AppError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn rename_rejects_empty_name_after_trim() {
+        let conn = test_db();
+        let pid = create(&conn, "Mix", None, 100).unwrap();
+        let err = rename(&conn, pid, "   ", 200).unwrap_err();
+        assert!(matches!(err, AppError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn get_tracks_includes_playlist_position() {
+        let conn = test_db();
+        let (pid, ids) = setup_with_three_tracks(&conn);
+        let views = get_tracks(&conn, pid).unwrap();
+        assert_eq!(views.len(), 3);
+        assert_eq!(views[0].track.track.id, ids[0]);
+        assert_eq!(views[0].playlist_position, 0);
+        assert_eq!(views[1].playlist_position, 1);
+        assert_eq!(views[2].playlist_position, 2);
+    }
+
+    #[test]
+    fn get_tracks_keeps_missing_tracks_for_playlists() {
+        let conn = test_db();
+        let (pid, ids) = setup_with_three_tracks(&conn);
+        tracks::mark_missing(&conn, &[ids[1]], 300).unwrap();
+        let views = get_tracks(&conn, pid).unwrap();
+        assert_eq!(views.len(), 3);
+        assert!(views[1].track.track.missing_at.is_some());
+        assert_eq!(views[1].playlist_position, 1);
+    }
+
+    #[test]
+    fn remove_track_compacts_remaining_positions() {
+        let conn = test_db();
+        let (pid, ids) = setup_with_three_tracks(&conn);
+        remove_track(&conn, pid, ids[1], 1).unwrap();
+        let views = get_tracks(&conn, pid).unwrap();
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].track.track.id, ids[0]);
+        assert_eq!(views[0].playlist_position, 0);
+        assert_eq!(views[1].track.track.id, ids[2]);
+        assert_eq!(views[1].playlist_position, 1);
+    }
+
+    #[test]
+    fn reorder_rejects_out_of_bounds_without_changing_order() {
+        let conn = test_db();
+        let (pid, _) = setup_with_three_tracks(&conn);
+        let err = reorder(&conn, pid, 0, 99).unwrap_err();
+        assert!(matches!(err, AppError::InvalidInput(_)));
+        let titles: Vec<String> = get_tracks(&conn, pid)
+            .unwrap()
+            .into_iter()
+            .map(|v| v.track.track.title)
+            .collect();
+        assert_eq!(titles, vec!["T1", "T2", "T3"]);
+    }
+
+    #[test]
+    fn compact_positions_handles_duplicate_track_rows() {
+        let conn = test_db();
+        let (pid, ids) = setup_with_three_tracks(&conn);
+        append_track(&conn, pid, ids[0], 400).unwrap();
+        remove_track(&conn, pid, ids[1], 1).unwrap();
+        let views = get_tracks(&conn, pid).unwrap();
+        let positions: Vec<i64> = views.iter().map(|v| v.playlist_position).collect();
+        let ids_after: Vec<i64> = views.iter().map(|v| v.track.track.id).collect();
+        assert_eq!(positions, vec![0, 1, 2]);
+        assert_eq!(ids_after, vec![ids[0], ids[2], ids[0]]);
     }
 }
