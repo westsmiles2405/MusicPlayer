@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { usePlayer } from "@/hooks/usePlayer";
 import type { Track } from "@/repositories/trackRepo";
 import type { Playlist, PlaylistTrack } from "@/repositories/playlistRepo";
@@ -14,6 +15,8 @@ interface TrackTableProps {
     sourcePosition: number,
     destinationPosition: number,
   ) => void;
+  showFavorite?: boolean;
+  onToggleFavorite?: (track: Track, favorite: boolean) => void;
 }
 
 export function TrackTable({
@@ -23,8 +26,13 @@ export function TrackTable({
   onAddToPlaylist,
   onRemoveFromPlaylist,
   onReorderPlaylist,
+  showFavorite,
+  onToggleFavorite,
 }: TrackTableProps) {
   const { play } = usePlayer();
+  const [pendingFavoriteIds, setPendingFavoriteIds] = useState<Set<number>>(
+    () => new Set(),
+  );
 
   const playableTracks = tracks.filter((t) => t.missingAt === null);
   const playableIds = playableTracks.map((t) => t.id);
@@ -59,6 +67,24 @@ export function TrackTable({
     play(row.id, playableIds, queueIndex >= 0 ? queueIndex : undefined);
   };
 
+  const handleToggleFavorite = onToggleFavorite
+    ? (row: TrackTableRow) => {
+        const track = tracks.find((t) => t.id === row.id);
+        if (!track || pendingFavoriteIds.has(track.id)) return;
+        onToggleFavorite(track, !track.isFavorite);
+        // 如果调用方没有在 mutation 的 onSuccess/onError 里清除 pending，
+        // 这里用乐观超时兜底：2s 后自动移除 pending 状态
+        setPendingFavoriteIds((prev) => new Set(prev).add(track.id));
+        setTimeout(() => {
+          setPendingFavoriteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(track.id);
+            return next;
+          });
+        }, 2000);
+      }
+    : undefined;
+
   const rows: TrackTableRow[] = tracks.map((t) => {
     const playlistPosition =
       "playlistPosition" in t
@@ -72,6 +98,8 @@ export function TrackTable({
       durationMs: t.durationMs,
       missingAt: t.missingAt,
       playlistPosition,
+      isFavorite: showFavorite ? t.isFavorite : undefined,
+      isFavoritePending: pendingFavoriteIds.has(t.id),
     };
   });
 
@@ -106,6 +134,7 @@ export function TrackTable({
       queueContext={queueContext}
       onPlay={handlePlay}
       onRemove={onRemoveFromPlaylist}
+      onToggleFavorite={handleToggleFavorite}
       onReorderPlaylist={onReorderPlaylist}
       renderActions={renderActions}
     />

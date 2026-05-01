@@ -62,4 +62,51 @@ describe("TrackTable", () => {
     );
     expect(screen.getByRole("button", { name: "播放 A" })).toBeDisabled();
   });
+
+  it("renders favorite toggles when showFavorite is true", () => {
+    const onToggleFavorite = vi.fn();
+    render(
+      <TrackTable
+        tracks={[baseTrack]}
+        queueContext="songs"
+        showFavorite
+        onToggleFavorite={onToggleFavorite}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "收藏" }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onToggleFavorite with next favorite value", () => {
+    const onToggleFavorite = vi.fn();
+    render(
+      <TrackTable
+        tracks={[{ ...baseTrack, isFavorite: false }]}
+        queueContext="songs"
+        showFavorite
+        onToggleFavorite={onToggleFavorite}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "收藏" }));
+    expect(onToggleFavorite).toHaveBeenCalledWith(
+      expect.objectContaining({ id: baseTrack.id }),
+      true,
+    );
+  });
+
+  it("shows cancel favorite when already favorited", () => {
+    const onToggleFavorite = vi.fn();
+    render(
+      <TrackTable
+        tracks={[{ ...baseTrack, isFavorite: true }]}
+        queueContext="songs"
+        showFavorite
+        onToggleFavorite={onToggleFavorite}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "取消收藏" }),
+    ).toBeInTheDocument();
+  });
 });

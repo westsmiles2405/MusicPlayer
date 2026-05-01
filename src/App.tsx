@@ -9,6 +9,9 @@ import ArtistDetailPage from "@/pages/ArtistDetailPage";
 import PlaylistsPage from "@/pages/PlaylistsPage";
 import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import SettingsPage from "@/pages/SettingsPage";
+import SearchPage from "@/pages/SearchPage";
+import FavoritesPage from "@/pages/FavoritesPage";
+import RecentPlaysPage from "@/pages/RecentPlaysPage";
 import NotFoundRedirect from "@/pages/NotFoundRedirect";
 
 export default function App() {
@@ -16,6 +19,7 @@ export default function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<NotFoundRedirect />} />
+        <Route path="search" element={<SearchPage />} />
         <Route path="library">
           <Route path="recent" element={<RecentPage />} />
           <Route path="songs" element={<SongsPage />} />
@@ -23,6 +27,8 @@ export default function App() {
           <Route path="albums/:id" element={<AlbumDetailPage />} />
           <Route path="artists" element={<ArtistsPage />} />
           <Route path="artists/:id" element={<ArtistDetailPage />} />
+          <Route path="favorites" element={<FavoritesPage />} />
+          <Route path="recent-plays" element={<RecentPlaysPage />} />
         </Route>
         <Route path="playlists" element={<PlaylistsPage />} />
         <Route path="playlists/:id" element={<PlaylistDetailPage />} />

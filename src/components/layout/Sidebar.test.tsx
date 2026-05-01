@@ -29,10 +29,13 @@ describe("Sidebar", () => {
       screen.getByRole("navigation", { name: "侧边栏" }),
     ).toBeInTheDocument();
 
+    expect(screen.getByRole("link", { name: "搜索" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "最近添加" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "歌曲" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "专辑" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "艺人" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "收藏" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "最近播放" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "全部播放列表" }),
     ).toBeInTheDocument();

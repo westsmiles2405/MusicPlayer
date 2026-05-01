@@ -545,9 +545,19 @@ pub fn set_favorite(conn: &Connection, id: i64, favorite: bool, now_ms: i64) -> 
     Ok(())
 }
 
+pub fn list_favorite_tracks(conn: &Connection) -> AppResult<Vec<TrackView>> {
+    let sql = format!(
+        "{} AND t.is_favorite = 1 ORDER BY t.title COLLATE NOCASE ASC",
+        base_track_view_select(" WHERE t.missing_at IS NULL"),
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([], track_view_from_row)?;
+    collect(rows)
+}
+
 // ---- internal helpers ----
 
-fn base_track_view_select(extra_where: &str) -> String {
+pub(crate) fn base_track_view_select(extra_where: &str) -> String {
     format!(
         "SELECT t.id, t.file_path, t.file_size, t.file_modified_at, t.hash, t.title,
                 t.album_id, t.primary_artist_id, t.album_artist_id,
@@ -564,7 +574,7 @@ fn base_track_view_select(extra_where: &str) -> String {
     )
 }
 
-fn track_view_from_row(row: &Row<'_>) -> rusqlite::Result<TrackView> {
+pub(crate) fn track_view_from_row(row: &Row<'_>) -> rusqlite::Result<TrackView> {
     Ok(TrackView {
         track: Track::from_row(row)?,
         album_name: row.get("album_name")?,
@@ -572,7 +582,7 @@ fn track_view_from_row(row: &Row<'_>) -> rusqlite::Result<TrackView> {
     })
 }
 
-fn collect<T, I>(iter: I) -> AppResult<Vec<T>>
+pub(crate) fn collect<T, I>(iter: I) -> AppResult<Vec<T>>
 where
     I: IntoIterator<Item = rusqlite::Result<T>>,
 {
@@ -886,5 +896,17 @@ mod tests {
             )
             .unwrap();
         assert_eq!(t.root_folder_id, Some(10));
+    }
+
+    #[test]
+    fn list_favorite_tracks_returns_only_favorites() {
+        let conn = test_db();
+        let t1 = make_basic_track(&conn, "Fav");
+        let t2 = make_basic_track(&conn, "Other");
+        set_favorite(&conn, t1, true, 100).unwrap();
+        let favorites = list_favorite_tracks(&conn).unwrap();
+        assert_eq!(favorites.len(), 1);
+        assert_eq!(favorites[0].track.id, t1);
+        assert_ne!(favorites[0].track.id, t2);
     }
 }

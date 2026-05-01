@@ -70,6 +70,19 @@ pub fn get_by_id(conn: &Connection, id: i64) -> AppResult<Option<Artist>> {
     Ok(opt)
 }
 
+pub fn search_by_name(conn: &Connection, query: &str, limit: i64) -> AppResult<Vec<Artist>> {
+    let pattern = format!("%{query}%");
+    let mut stmt = conn.prepare(
+        "SELECT id, name, added_at, updated_at FROM artists WHERE name LIKE ?1 ORDER BY name COLLATE NOCASE LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![pattern, limit.max(1)], Artist::from_row)?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok(out)
+}
+
 pub fn find_by_name(conn: &Connection, name: &str) -> AppResult<Option<Artist>> {
     let opt = conn
         .query_row(

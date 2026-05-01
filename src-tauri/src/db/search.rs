@@ -2,12 +2,33 @@
 
 use rusqlite::{params, Connection};
 
-use crate::db::tracks::{Track, TrackView};
+use crate::db::{albums, artists, playlists, tracks};
 use crate::error::AppResult;
+
+pub struct SearchResult {
+    pub tracks: Vec<tracks::TrackView>,
+    pub albums: Vec<albums::AlbumView>,
+    pub artists: Vec<artists::Artist>,
+    pub playlists: Vec<playlists::PlaylistSummary>,
+}
+
+pub fn search_all(conn: &Connection, query: &str, limit_per_group: i64) -> AppResult<SearchResult> {
+    let limit = limit_per_group.max(1);
+    Ok(SearchResult {
+        tracks: search_tracks(conn, query, limit)?,
+        albums: albums::search_by_name(conn, query, limit)?,
+        artists: artists::search_by_name(conn, query, limit)?,
+        playlists: playlists::search_by_name(conn, query, limit)?,
+    })
+}
 
 /// 搜索曲目。空 query 返回空结果（不要把"无"翻译成 MATCH '*' 触发 FTS5 错误）。
 /// 用前缀匹配让用户输入"hel"也能命中"Hello World"。
-pub fn search_tracks(conn: &Connection, query: &str, limit: i64) -> AppResult<Vec<TrackView>> {
+pub fn search_tracks(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+) -> AppResult<Vec<tracks::TrackView>> {
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return Ok(Vec::new());
@@ -33,8 +54,8 @@ pub fn search_tracks(conn: &Connection, query: &str, limit: i64) -> AppResult<Ve
          LIMIT ?2",
     )?;
     let rows = stmt.query_map(params![escaped, limit], |row| {
-        Ok(TrackView {
-            track: Track::from_row_via_helper(row)?,
+        Ok(tracks::TrackView {
+            track: tracks::Track::from_row_via_helper(row)?,
             album_name: row.get("album_name")?,
             primary_artist_name: row.get("primary_artist_name")?,
         })
@@ -123,5 +144,49 @@ mod tests {
         let q = build_fts_query(r#"hello "world""#);
         assert!(q.contains(r#""hello"*"#));
         assert!(q.contains(r#""""world"""*"#)); // 双引号被转义
+    }
+
+    #[test]
+    fn search_all_returns_grouped_results() {
+        let conn = test_db();
+        let artist_id = crate::db::artists::upsert_by_name(&conn, "Love Artist", 100).unwrap();
+        let album_id =
+            crate::db::albums::upsert(&conn, "Love Album", artist_id, Some(2024), 100).unwrap();
+        let _track_id = crate::db::tracks::insert(
+            &conn,
+            &crate::db::tracks::NewTrack {
+                file_path: "/music/love.mp3".into(),
+                file_size: 1,
+                file_modified_at: 1,
+                hash: None,
+                title: "Love Song".into(),
+                album_id: Some(album_id),
+                primary_artist_id: Some(artist_id),
+                album_artist_id: Some(artist_id),
+                track_no: Some(1),
+                disc_no: Some(1),
+                year: Some(2024),
+                genre: None,
+                duration_ms: 1000,
+                bitrate: None,
+                sample_rate: None,
+                channels: None,
+                codec: None,
+                root_folder_id: None,
+            },
+            100,
+        )
+        .unwrap();
+        let playlist_id = crate::db::playlists::create(&conn, "Love Playlist", None, 100).unwrap();
+
+        let result = search_all(&conn, "love", 10).unwrap();
+
+        assert!(result.tracks.iter().any(|t| t.track.title == "Love Song"));
+        assert!(result.albums.iter().any(|a| a.album.name == "Love Album"));
+        assert!(result.artists.iter().any(|a| a.name == "Love Artist"));
+        assert!(result
+            .playlists
+            .iter()
+            .any(|p| p.playlist.id == playlist_id));
     }
 }

@@ -9,7 +9,7 @@ describe("v0.2.0 core data layer smoke", () => {
     const { artistRepo } = await import("@/repositories/artistRepo");
     const { playlistRepo } = await import("@/repositories/playlistRepo");
     const { searchRepo } = await import("@/repositories/searchRepo");
-    const { historyRepo } = await import("@/repositories/historyRepo");
+    const { recentPlayRepo } = await import("@/repositories/recentPlayRepo");
 
     expect(trackRepo.list).toBeDefined();
     expect(albumRepo.list).toBeDefined();
@@ -17,8 +17,8 @@ describe("v0.2.0 core data layer smoke", () => {
     expect(artistRepo.list).toBeDefined();
     expect(artistRepo.get).toBeDefined();
     expect(playlistRepo.list).toBeDefined();
-    expect(searchRepo.query).toBeDefined();
-    expect(historyRepo.recent).toBeDefined();
+    expect(searchRepo.search).toBeDefined();
+    expect(recentPlayRepo.list).toBeDefined();
   });
 
   it("TrackSort type is a string union", () => {

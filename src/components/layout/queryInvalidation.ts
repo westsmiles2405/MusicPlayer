@@ -1,6 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 const refreshableRoots = new Set([
+  "search",
+  "favoriteTracks",
+  "recentPlays",
   "tracks",
   "recentlyAdded",
   "albums",
