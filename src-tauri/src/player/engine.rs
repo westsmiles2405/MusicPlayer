@@ -19,6 +19,7 @@ use ringbuf::{HeapCons, HeapProd, HeapRb};
 
 use crate::error::{AppError, AppResult};
 use crate::player::decoder::DecodedTrack;
+use crate::player::gapless::{GaplessPredecoder, GaplessRequest, GaplessResult};
 use crate::player::queue::{PlayQueue, QueueMove};
 use crate::player::state::{
     now_ms, EngineCommand, EngineTrack, NowPlayingTrack, PlaybackErrorCode, PlaybackErrorEvent,
@@ -209,6 +210,7 @@ pub struct AudioEngine {
     decoder: Option<DecodedTrack>,
     session: Option<PlaybackSession>,
     last_tick: Instant,
+    gapless: GaplessPredecoder,
 }
 
 impl AudioEngine {
@@ -233,6 +235,7 @@ impl AudioEngine {
                 decoder: None,
                 session: None,
                 last_tick: Instant::now(),
+                gapless: GaplessPredecoder::new(),
             };
             engine.run();
         })
@@ -379,6 +382,7 @@ impl AudioEngine {
 
     fn stop(&mut self) {
         self.finish_session(SessionEndReason::Stop);
+        self.gapless.cancel();
         self.audio.clear();
         self.stream = None;
         self.decoder = None;
@@ -524,6 +528,7 @@ impl AudioEngine {
     }
 
     fn finish_session(&mut self, reason: SessionEndReason) {
+        self.gapless.cancel();
         if let Some(session) = self.session.take() {
             let _ = self.event_tx.send(PlayerEvent::SessionEnded {
                 session,
@@ -536,6 +541,74 @@ impl AudioEngine {
     fn advance_next(&mut self) {
         self.decoder = None;
         self.audio.clear();
+        // Try to use a pre-decoded gapless result first.
+        if let Some(GaplessResult::Ready {
+            track_id,
+            decoder,
+            first_chunk,
+        }) = self.gapless.poll()
+        {
+            if Some(track_id) == self.queue.as_ref().and_then(|q| q.current()) {
+                if self.stream.is_none() {
+                    match open_default_stream(
+                        self.audio.clone(),
+                        self.event_tx.clone(),
+                        self.stream_error_flag.clone(),
+                    ) {
+                        Ok((stream, _config)) => self.stream = Some(stream),
+                        Err(err) => {
+                            self.snapshot.status = PlaybackStatus::Error;
+                            self.emit_error(
+                                Some(track_id),
+                                PlaybackErrorCode::OutputUnavailable,
+                                &err.to_string(),
+                                false,
+                            );
+                            let _ = self
+                                .event_tx
+                                .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                            return;
+                        }
+                    }
+                }
+                self.decoder = Some(decoder);
+                self.audio.clear();
+                self.producer.push_samples(&first_chunk.samples);
+                self.snapshot.status = PlaybackStatus::Playing;
+                self.snapshot.position_ms =
+                    first_chunk.start_ms + first_chunk.duration_ms;
+                let session =
+                    PlaybackSession::new(track_id, now_ms());
+                if let Some(ref mut s) = self.session {
+                    *s = session;
+                } else {
+                    self.session = Some(session);
+                }
+                self.snapshot.current = self
+                    .tracks
+                    .iter()
+                    .find(|t| t.id == track_id)
+                    .map(|t| NowPlayingTrack::from(t.clone()));
+                self.snapshot.duration_ms = self
+                    .tracks
+                    .iter()
+                    .find(|t| t.id == track_id)
+                    .map(|t| t.duration_ms)
+                    .unwrap_or(0);
+                self.snapshot.queue_index =
+                    self.queue.as_ref().and_then(|q| q.current_index());
+                self.snapshot.queue_len =
+                    self.queue.as_ref().map(|q| q.len()).unwrap_or(0);
+                self.last_tick = Instant::now();
+                let _ = self
+                    .event_tx
+                    .send(PlayerEvent::TrackChanged(self.snapshot.current.clone()));
+                let _ = self
+                    .event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                return;
+            }
+        }
         if let Some(ref mut q) = self.queue {
             match q.next() {
                 QueueMove::Track(_) => {
@@ -653,9 +726,31 @@ impl AudioEngine {
                 }
             }
         }
+        // If approaching end of track, warm up the next one in background.
+        self.maybe_start_gapless_predecode();
+
         let _ = self.event_tx.send(PlayerEvent::Progress {
             position_ms: self.snapshot.position_ms,
             duration_ms: self.snapshot.duration_ms,
+        });
+    }
+
+    fn maybe_start_gapless_predecode(&mut self) {
+        if self.snapshot.duration_ms - self.snapshot.position_ms > 1_000 {
+            return;
+        }
+        let Some(queue) = &self.queue else { return };
+        let Some(next_id) = queue.peek_next_track_id() else {
+            return;
+        };
+        let Some(track) = self.tracks.iter().find(|t| t.id == next_id) else {
+            return;
+        };
+        self.gapless.start(GaplessRequest {
+            track_id: track.id,
+            file_path: PathBuf::from(&track.file_path),
+            output_sample_rate: 48_000,
+            output_channels: 2,
         });
     }
 

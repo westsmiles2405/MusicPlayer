@@ -120,6 +120,23 @@ impl PlayQueue {
         QueueMove::RestartCurrent(self.original[self.order[index]])
     }
 
+    /// What track ID would `next()` produce without mutating state.
+    /// Used by gapless predecode to know which track to warm up.
+    pub fn peek_next_track_id(&self) -> Option<i64> {
+        let index = self.index?;
+        if self.repeat_mode == RepeatMode::One {
+            return Some(self.original[self.order[index]]);
+        }
+        let next = index + 1;
+        if next < self.order.len() {
+            return Some(self.original[self.order[next]]);
+        }
+        if self.repeat_mode == RepeatMode::All {
+            return Some(self.original[self.order[0]]);
+        }
+        None
+    }
+
     pub fn remove_current_unplayable(&mut self) -> QueueMove {
         let Some(index) = self.index else {
             return QueueMove::Ended;
@@ -202,5 +219,20 @@ mod tests {
         let mut q = PlayQueue::from_tracks(vec![1, 2, 3], 1).unwrap();
         assert_eq!(q.remove_current_unplayable(), QueueMove::Track(3));
         assert_eq!(q.len(), 2);
+    }
+
+    #[test]
+    fn peek_next_respects_repeat_all() {
+        let mut q = PlayQueue::from_tracks(vec![1, 2], 1).unwrap();
+        assert_eq!(q.peek_next_track_id(), None);
+        q.set_repeat_mode(RepeatMode::All);
+        assert_eq!(q.peek_next_track_id(), Some(1));
+    }
+
+    #[test]
+    fn peek_next_returns_next_without_mutating() {
+        let q = PlayQueue::from_tracks(vec![10, 20, 30], 0).unwrap();
+        assert_eq!(q.peek_next_track_id(), Some(20));
+        assert_eq!(q.current_index(), Some(0)); // unchanged
     }
 }
