@@ -8,7 +8,7 @@
 
 - **目标平台**：macOS（首发，Mac App Store）+ Web（GitHub Pages）；Windows 推迟到 v1.x。
 - **项目性质**：个人作品集 → 演进为公开发布产品（GitHub 公开，MIT License）。
-- **当前版本**：v0.3.0（库扫描器已交付）→ v0.4.0（音频引擎）。
+- **当前版本**：v0.4.0（音频引擎已交付）→ v0.5.0（资料库浏览 + 播放列表）。
 - **当前阶段**：Phase 1 / v1.0 — **本地音乐播放器**（无后端、无 DRM）。
 - **完整设计**：见 `docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`。
 - **背景调研**：`Apple Music 风格音乐播放器分析报告.pdf`（项目根，14 页）。
@@ -68,8 +68,9 @@ MusicPlayer/
 │   ├── components/{layout,player,library,ui,effects}/
 │   │   └── layout/ScanProgressBar.tsx   # 全局扫描进度条
 │   ├── stores/                 # Zustand: playerStore / uiStore / prefsStore
-│   ├── hooks/                  # useScanProgress (scan_progress/scan_done 事件)
+│   ├── hooks/                  # usePlayer (playback_state/track_changed/progress/error 事件) / useScanProgress
 │   ├── repositories/           # ⚠️ 关键解耦层（Phase 2 切 HTTP 时只改这里）
+│   │   └── playerRepo.ts      # player_* Tauri invoke 封装
 │   ├── lib/  i18n/  styles/
 │
 ├── src-tauri/                  # Rust 核心
@@ -81,8 +82,8 @@ MusicPlayer/
 │   │   └── fixtures/audio/     # ffmpeg 生成的 1 秒静音 mp3/flac/m4a/wav/no-tag
 │   └── src/
 │       ├── main.rs
-│       ├── commands/           # 命令面：add_music_folder / list_music_folders / remove_music_folder / start_scan / cancel_scan
-│       ├── player/             # symphonia + cpal + 队列 + Gapless（v0.4.0）
+│       ├── commands/           # player_* / library_* / playlist_* / prefs_*
+│       ├── player/             # ✅ v0.4.0：engine（ringbuf+cpal）/ decoder（symphonia）/ manager（DB解析+事件桥）/ queue（确定性洗牌）/ gapless（后台预解码）/ state（双层命令+会话）
 │       ├── library/            # scanner（walk→reader→indexer 管道）/ watcher（v0.3.1）
 │       ├── metadata/           # reader（lofty + xxh3） / art（封面缓存，内容 hash 去重）
 │       ├── db/                 # tracks / albums / artists / playlists / scan_folders / search / schema
@@ -107,6 +108,10 @@ MusicPlayer/
 8. **错误分三档**：轻微（log）/ 中等（toast）/ 严重（模态阻塞）。统一从 `src-tauri/src/error.rs::AppError` 流到前端 ErrorBoundary。新增 `AppError::Busy` 用于扫描互斥。
 9. **i18next 必须在 `src/main.tsx` 顶部 side-effect import**（`import "@/i18n";`），否则被 Vite tree-shake，`useTranslation()` 拿不到资源。
 10. **Rust 子模块必须在父 `mod.rs` 里 `pub mod` 显式声明**（`commands/mod.rs` / `db/mod.rs`），否则 `tauri::generate_handler!` 找不到目标。
+11. **音频回调不能拿锁**。cpal callback 用 `ringbuf` Consumer 的 `try_lock()`（非阻塞）+ 原子变量读音量/静音；若 try_lock 失败直接写静音。Engine 线程持有 Producer 推 PCM。`SharedAudioBuffer::clear()` 用 `lock()` 阻塞清空（仅在 stop/seek 时调用）。
+12. **PlayerCommand 双层架构**。Manager 层接收 `PlayerCommand`（裸 track ID），解析 DB 后转发 `EngineCommand`（含已解析 `EngineTrack`）给 Engine。Engine 永远不碰 DB。
+13. **Buffer 背压模型**。`push_samples()` 返回实际写入的样本数；position 仅按已写入样本推进。ringbuf 满时未写入的 chunk 尾部存入 `pending_samples`，下个 tick 优先写入。`flush_pending()` 后若仍有残留 → 跳过 decoder 本 tick。
+14. **Gapless 只在失效路径 cancel**。`finish_session(Stop/Replaced/DecodeError/OutputError/Shutdown)` 取消预解码；`Completed/Next/Previous` 保留结果，供 `advance_next()` 队列推进后消费。
 
 ## 6. 工程规范
 
@@ -128,14 +133,14 @@ MusicPlayer/
 2. 资料库浏览（侧边栏：资料库 → 最近添加 / 艺人 / 专辑 / 歌曲）
 3. 专辑 / 艺人详情页（封面取色背景）
 4. 用户播放列表（CRUD + 拖拽排序）
-5. 播放控制（播放/暂停/上下首/进度/音量）
-6. 播放队列（即将播放、历史、随机、循环）
-7. 底部 Mini Player + 上拉 Now Playing 大屏
+5. ~~播放控制~~ ✅ v0.4.0（播放/暂停/上下首/进度/音量，ringbuf 背压 + pending buffer）
+6. ~~播放队列~~ ✅ v0.4.0（确定性顺序/随机/循环/单曲循环，PlayQueue）
+7. ~~底部 Mini Player~~ ✅ v0.4.0（传输控件/进度条/音量/错误显示）
 8. 全局搜索（FTS5）
 9. 最近播放 + 收藏
-10. macOS Now Playing 系统集成（媒体栏 / 控制中心 / 媒体键 / AirPods 暂停）
+10. ~~macOS Now Playing 系统集成~~ ✅ v0.4.0（MPNowPlayingInfoCenter + MPRemoteCommandCenter，媒体键/控制中心）
 11. 毛玻璃 UI（系统材质 NSVisualEffectView，Web 端用 backdrop-filter 兜底）
-12. **Gapless 无缝播放**（双缓冲，作品集亮点）
+12. ~~**Gapless 无缝播放**~~ ✅ v0.4.0（后台预解码下一首首个 chunk，<1s 剩余时触发）
 13. **键盘快捷键**（空格 / ⌘F / 媒体键）
 14. **i18n 框架**（zh 优先）
 15. **主题跟随系统**（不做手动切换）
@@ -151,33 +156,34 @@ pnpm dev                     # 仅启动 Web 端开发服务
 
 # 测试
 pnpm test                    # Vitest 前端单元
-cargo test --manifest-path src-tauri/Cargo.toml   # Rust 测试
+CARGO_TARGET_DIR=/tmp/musicplayer-target cargo test --manifest-path src-tauri/Cargo.toml   # Rust 测试
 pnpm lint                    # ESLint + Prettier --check
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+CARGO_TARGET_DIR=/tmp/musicplayer-target cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
 # 前端独立验证（不跑 Rust，秒级）
 pnpm build                   # tsc + vite build；只想验前端配置/类型时用这个
 
 # 出包
-pnpm tauri build --debug --bundles app   # 仅出 .app（跳过签名，秒级验证）
+CARGO_TARGET_DIR=/tmp/musicplayer-target pnpm tauri build --debug --bundles app   # 仅出 .app
 pnpm tauri build                         # 本地出 DMG（需签名配置）
 pnpm tauri build --target universal-apple-darwin   # Intel + ARM 通用
 
 # Rust 部分验证（不跑前端）
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo check --manifest-path src-tauri/Cargo.toml
+CARGO_TARGET_DIR=/tmp/musicplayer-target cargo test --manifest-path src-tauri/Cargo.toml
+CARGO_TARGET_DIR=/tmp/musicplayer-target cargo check --manifest-path src-tauri/Cargo.toml
 ```
+
+> **`CARGO_TARGET_DIR=/tmp/musicplayer-target` 是必须的**：仓库本地 `src-tauri/target` 曾出现重复产物（`libmuda-bb064cc9d7a039bb 2.rmeta`），统一用 `/tmp` 路径避免损坏。
 
 > **已知现象**：未配置代码签名时 `pnpm tauri build` 的 DMG 步骤会失败但 `.app` 已生成 — 是预期，不是 bug。
 
 ## 9. 关键风险（开发时留意）
 
 - **Mac App Store 沙盒**：访问音乐文件夹需用户授权 + security-scoped bookmark；写在 Rust 侧 macOS-specific 模块。
-- **macOS Now Playing 集成**：需 objc 桥接（`objc2` crate），Tauri 现成 plugin 不一定够用。
+- **macOS Now Playing 集成**：✅ 已通过 objc2 0.6 + objc2-media-player 0.3 + block2 0.6 实现。注意：`msg_send!` 参数间需要逗号（objc2 0.6 语法），`NSMutableDictionary::insert` 的 `CopyingHelper` 约束对 `&NSString` 不满足（用 `msg_send!` 绕开），`RcBlock` 不是 `Send`（丢弃 `addTargetWithHandler` 返回值即可，MPRemoteCommandCenter 内部 retain）。
 - **FLAC / ALAC 兼容性**：symphonia 对部分变体支持有限，必要时 fallback 到 ffmpeg-rs（Phase 1.x）。
 - **Web 端音频**：用 Web Audio API 兜底，体验弱化（无 Gapless / 无低延迟）。
-- **Tauri 2.x 仍在迭代**：锁版本、关注 changelog。
 
 ## 10. Claude 工作约定
 
@@ -194,6 +200,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 - 设计文档：`docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`
 - v0.3.0 scanner spec：`docs/superpowers/specs/2026-05-01-v0.3.0-library-scanner-design.md`
 - v0.3.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.3.0-library-scanner.md`
+- v0.4.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.4.0-audio-engine.md`
 - 调研报告：`Apple Music 风格音乐播放器分析报告.pdf`
 - Tauri 2 文档：https://tauri.app/start/
 - React 19：https://react.dev/
