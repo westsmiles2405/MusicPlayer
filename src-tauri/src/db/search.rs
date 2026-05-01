@@ -12,11 +12,7 @@ pub struct SearchResult {
     pub playlists: Vec<playlists::PlaylistSummary>,
 }
 
-pub fn search_all(
-    conn: &Connection,
-    query: &str,
-    limit_per_group: i64,
-) -> AppResult<SearchResult> {
+pub fn search_all(conn: &Connection, query: &str, limit_per_group: i64) -> AppResult<SearchResult> {
     let limit = limit_per_group.max(1);
     Ok(SearchResult {
         tracks: search_tracks(conn, query, limit)?,
@@ -28,7 +24,11 @@ pub fn search_all(
 
 /// 搜索曲目。空 query 返回空结果（不要把"无"翻译成 MATCH '*' 触发 FTS5 错误）。
 /// 用前缀匹配让用户输入"hel"也能命中"Hello World"。
-pub fn search_tracks(conn: &Connection, query: &str, limit: i64) -> AppResult<Vec<tracks::TrackView>> {
+pub fn search_tracks(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+) -> AppResult<Vec<tracks::TrackView>> {
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return Ok(Vec::new());

@@ -131,7 +131,11 @@ pub fn list(conn: &Connection) -> AppResult<Vec<PlaylistSummary>> {
     Ok(out)
 }
 
-pub fn search_by_name(conn: &Connection, query: &str, limit: i64) -> AppResult<Vec<PlaylistSummary>> {
+pub fn search_by_name(
+    conn: &Connection,
+    query: &str,
+    limit: i64,
+) -> AppResult<Vec<PlaylistSummary>> {
     let pattern = format!("%{query}%");
     let mut stmt = conn.prepare(
         "SELECT p.id, p.name, p.description, p.cover_path, p.created_at, p.updated_at,

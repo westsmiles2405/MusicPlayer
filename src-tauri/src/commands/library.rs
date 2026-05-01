@@ -307,8 +307,7 @@ pub async fn library_get_recent_played_tracks(
     db: State<'_, Database>,
     limit: Option<i64>,
 ) -> AppResult<Vec<RecentPlayedTrackDto>> {
-    let rows =
-        db.with_conn(|c| play_history::list_recent_played_tracks(c, limit.unwrap_or(50)))?;
+    let rows = db.with_conn(|c| play_history::list_recent_played_tracks(c, limit.unwrap_or(50)))?;
     Ok(rows
         .into_iter()
         .map(|row| RecentPlayedTrackDto {
