@@ -251,6 +251,73 @@ pub fn cancel_scan(manager: State<'_, ScanManager>) -> AppResult<()> {
     Ok(())
 }
 
+// ---- v0.6.0: grouped search, favorites, recent plays ----
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResultDto {
+    pub tracks: Vec<tracks::TrackView>,
+    pub albums: Vec<albums::AlbumView>,
+    pub artists: Vec<artists::Artist>,
+    pub playlists: Vec<crate::db::playlists::PlaylistSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentPlayedTrackDto {
+    #[serde(flatten)]
+    pub track: tracks::TrackView,
+    pub last_played_at: i64,
+}
+
+#[tauri::command]
+pub async fn library_search_all(
+    db: State<'_, Database>,
+    query: String,
+    limit_per_group: Option<i64>,
+) -> AppResult<SearchResultDto> {
+    let trimmed = query.trim().to_string();
+    if trimmed.is_empty() {
+        return Ok(SearchResultDto {
+            tracks: vec![],
+            albums: vec![],
+            artists: vec![],
+            playlists: vec![],
+        });
+    }
+    let result =
+        db.with_conn(|c| search::search_all(c, &trimmed, limit_per_group.unwrap_or(10)))?;
+    Ok(SearchResultDto {
+        tracks: result.tracks,
+        albums: result.albums,
+        artists: result.artists,
+        playlists: result.playlists,
+    })
+}
+
+#[tauri::command]
+pub async fn library_get_favorite_tracks(
+    db: State<'_, Database>,
+) -> AppResult<Vec<tracks::TrackView>> {
+    db.with_conn(tracks::list_favorite_tracks)
+}
+
+#[tauri::command]
+pub async fn library_get_recent_played_tracks(
+    db: State<'_, Database>,
+    limit: Option<i64>,
+) -> AppResult<Vec<RecentPlayedTrackDto>> {
+    let rows =
+        db.with_conn(|c| play_history::list_recent_played_tracks(c, limit.unwrap_or(50)))?;
+    Ok(rows
+        .into_iter()
+        .map(|row| RecentPlayedTrackDto {
+            track: row.track,
+            last_played_at: row.last_played_at,
+        })
+        .collect())
+}
+
 // ---- legacy alias ----
 
 /// 向后兼容旧 API：v0.3.0 之前 add_folder 只写 scan_folders 表不做扫描。

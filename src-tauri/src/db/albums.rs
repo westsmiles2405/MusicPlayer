@@ -117,6 +117,32 @@ pub fn get_by_id(conn: &Connection, id: i64) -> AppResult<Option<AlbumView>> {
     Ok(opt)
 }
 
+pub fn search_by_name(conn: &Connection, query: &str, limit: i64) -> AppResult<Vec<AlbumView>> {
+    let pattern = format!("%{query}%");
+    let mut stmt = conn.prepare(
+        "SELECT a.id, a.name, a.album_artist_id, a.year, a.cover_path, a.added_at, a.updated_at,
+                ar.name AS album_artist_name,
+                (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id AND t.missing_at IS NULL) AS track_count
+         FROM albums a
+         JOIN artists ar ON ar.id = a.album_artist_id
+         WHERE a.name LIKE ?1
+         ORDER BY a.name COLLATE NOCASE
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(rusqlite::params![pattern, limit.max(1)], |row| {
+        Ok(AlbumView {
+            album: Album::from_row(row)?,
+            album_artist_name: row.get("album_artist_name")?,
+            track_count: row.get("track_count")?,
+        })
+    })?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r?);
+    }
+    Ok(out)
+}
+
 pub fn set_cover_path(conn: &Connection, id: i64, cover_path: &str, now_ms: i64) -> AppResult<()> {
     let n = conn.execute(
         "UPDATE albums SET cover_path = ?1, updated_at = ?2 WHERE id = ?3",
