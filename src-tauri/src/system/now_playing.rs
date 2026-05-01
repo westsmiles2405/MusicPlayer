@@ -46,6 +46,7 @@ impl NowPlaying {
         }
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         #[cfg(target_os = "macos")]
         self.inner.clear();
@@ -63,12 +64,16 @@ mod platform {
             Self
         }
 
+        #[allow(dead_code)]
         pub fn set_command_sender(&mut self, _tx: crossbeam_channel::Sender<EngineCommand>) {}
 
+        #[allow(dead_code)]
         pub fn update(&mut self, _snapshot: &PlayerSnapshot) {}
 
+        #[allow(dead_code)]
         pub fn update_progress(&mut self, _position_ms: i64, _duration_ms: i64) {}
 
+        #[allow(dead_code)]
         pub fn clear(&mut self) {}
     }
 }

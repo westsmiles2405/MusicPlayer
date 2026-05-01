@@ -8,8 +8,8 @@ use crate::db::{self, Database};
 use crate::error::{AppError, AppResult};
 use crate::player::engine::AudioEngine;
 use crate::player::state::{
-    now_ms, EngineCommand, EngineTrack, PlaybackErrorCode, PlaybackErrorEvent,
-    PlaybackSession, PlayerCommand, PlayerEvent, PlayerSnapshot, SessionEndReason,
+    now_ms, EngineCommand, EngineTrack, PlaybackErrorCode, PlaybackErrorEvent, PlaybackSession,
+    PlayerCommand, PlayerEvent, PlayerSnapshot, SessionEndReason,
 };
 use crate::system::now_playing::NowPlaying;
 
@@ -33,19 +33,8 @@ impl PlayerManager {
         let mut now_playing = NowPlaying::new();
         now_playing.set_command_sender(engine_cmd_tx.clone());
 
-        spawn_event_bridge(
-            app,
-            db.clone(),
-            snapshot.clone(),
-            now_playing,
-            event_rx,
-        );
-        spawn_player_command_handler(
-            db.clone(),
-            player_cmd_rx,
-            engine_cmd_tx.clone(),
-            event_tx,
-        );
+        spawn_event_bridge(app, db.clone(), snapshot.clone(), now_playing, event_rx);
+        spawn_player_command_handler(db.clone(), player_cmd_rx, engine_cmd_tx.clone(), event_tx);
 
         Self {
             player_cmd_tx,
@@ -74,12 +63,11 @@ impl PlayerManager {
         queue_track_ids: Option<Vec<i64>>,
         queue_index: Option<usize>,
     ) -> AppResult<()> {
-        let (queue, index) =
-            normalize_queue_args(track_id, queue_track_ids, queue_index)?;
+        let (queue, index) = normalize_queue_args(track_id, queue_track_ids, queue_index)?;
         // Resolve tracks here on the calling thread (typically command handler)
         let tracks = resolve_tracks(&self.db, &queue)?;
         // Verify the selected track exists
-        if tracks.get(index).map_or(true, |t| t.missing_at.is_some()) {
+        if tracks.get(index).is_none_or(|t| t.missing_at.is_some()) {
             return Err(AppError::FileNotFound(format!(
                 "selected track {track_id} is missing or not found"
             )));
@@ -270,7 +258,13 @@ fn flush_session(
     let played_at = now_ms();
     let duration_played = session.real_played_ms.min(duration_ms.max(0));
     let result = db.with_conn(|conn| {
-        db::play_history::record(conn, session.track_id, played_at, duration_played, completed)
+        db::play_history::record(
+            conn,
+            session.track_id,
+            played_at,
+            duration_played,
+            completed,
+        )
     });
     if result.is_ok() && completed {
         session.completed_written = true;
@@ -288,9 +282,8 @@ pub fn normalize_queue_args(
         Some(ids) if !ids.is_empty() => ids,
         _ => vec![track_id],
     };
-    let index = queue_index.unwrap_or_else(|| {
-        queue.iter().position(|id| *id == track_id).unwrap_or(0)
-    });
+    let index =
+        queue_index.unwrap_or_else(|| queue.iter().position(|id| *id == track_id).unwrap_or(0));
     if index >= queue.len() {
         return Err(AppError::InvalidInput(format!(
             "queueIndex {index} out of range for queue length {}",

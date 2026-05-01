@@ -174,6 +174,7 @@ impl PlaybackSession {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SessionEndReason {
     Completed,
     Stop,
@@ -192,33 +193,21 @@ pub enum SessionEndReason {
 // translates to EngineCommand for the engine.
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum PlayerCommand {
-    LoadQueueAndPlayIds {
-        queue: Vec<i64>,
-        index: usize,
-    },
+    LoadQueueAndPlayIds { queue: Vec<i64>, index: usize },
     Pause,
     Resume,
     Toggle,
     Stop,
-    Seek {
-        position_ms: i64,
-    },
+    Seek { position_ms: i64 },
     Next,
     Previous,
-    SetVolume {
-        volume: f32,
-    },
-    SetMuted {
-        muted: bool,
-    },
+    SetVolume { volume: f32 },
+    SetMuted { muted: bool },
     ToggleMute,
-    SetRepeatMode {
-        mode: RepeatMode,
-    },
-    SetShuffle {
-        enabled: bool,
-    },
+    SetRepeatMode { mode: RepeatMode },
+    SetShuffle { enabled: bool },
     Shutdown,
 }
 

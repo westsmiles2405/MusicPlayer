@@ -35,17 +35,6 @@ pub struct SharedAudioBuffer {
 }
 
 impl SharedAudioBuffer {
-    pub fn new(capacity_samples: usize, volume: f32, muted: bool) -> Self {
-        let rb = HeapRb::<f32>::new(capacity_samples);
-        let (_, consumer) = rb.split();
-        Self {
-            consumer: Mutex::new(consumer),
-            volume_bits: AtomicU32::new(volume.clamp(0.0, 1.0).to_bits()),
-            muted: AtomicBool::new(muted),
-            underruns: AtomicU64::new(0),
-        }
-    }
-
     pub fn set_volume(&self, volume: f32) {
         self.volume_bits
             .store(volume.clamp(0.0, 1.0).to_bits(), Ordering::Relaxed);
@@ -262,11 +251,8 @@ impl AudioEngine {
                 self.finish_session(SessionEndReason::Replaced);
                 self.tracks = tracks;
                 self.queue = Some(
-                    PlayQueue::from_tracks(
-                        self.tracks.iter().map(|t| t.id).collect(),
-                        index,
-                    )
-                    .unwrap(),
+                    PlayQueue::from_tracks(self.tracks.iter().map(|t| t.id).collect(), index)
+                        .unwrap(),
                 );
                 self.start_current_track();
             }
@@ -300,18 +286,24 @@ impl AudioEngine {
                 let volume = volume.clamp(0.0, 1.0);
                 self.audio.set_volume(volume);
                 self.snapshot.volume = volume;
-                let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                let _ = self
+                    .event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
             EngineCommand::SetMuted { muted } => {
                 self.audio.set_muted(muted);
                 self.snapshot.muted = muted;
-                let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                let _ = self
+                    .event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
             EngineCommand::ToggleMute => {
                 let muted = !self.snapshot.muted;
                 self.audio.set_muted(muted);
                 self.snapshot.muted = muted;
-                let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+                let _ = self
+                    .event_tx
+                    .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
             EngineCommand::Shutdown => {
                 self.stop();
@@ -325,7 +317,8 @@ impl AudioEngine {
     fn pause(&mut self) {
         if self.snapshot.status == PlaybackStatus::Playing {
             self.snapshot.status = PlaybackStatus::Paused;
-            let _ = self.event_tx
+            let _ = self
+                .event_tx
                 .send(PlayerEvent::Snapshot(self.snapshot.clone()));
         }
     }
@@ -334,7 +327,8 @@ impl AudioEngine {
         if self.snapshot.status == PlaybackStatus::Paused {
             self.snapshot.status = PlaybackStatus::Playing;
             self.last_tick = Instant::now();
-            let _ = self.event_tx
+            let _ = self
+                .event_tx
                 .send(PlayerEvent::Snapshot(self.snapshot.clone()));
         }
     }
@@ -342,7 +336,9 @@ impl AudioEngine {
     fn seek_to(&mut self, target_ms: i64) {
         let was_paused = self.snapshot.status == PlaybackStatus::Paused;
         self.snapshot.status = PlaybackStatus::Buffering;
-        let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+        let _ = self
+            .event_tx
+            .send(PlayerEvent::Snapshot(self.snapshot.clone()));
         self.audio.clear();
         if let Some(ref mut decoder) = self.decoder {
             match decoder.seek_ms(target_ms) {
@@ -368,7 +364,9 @@ impl AudioEngine {
             PlaybackStatus::Playing
         };
         self.last_tick = Instant::now();
-        let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+        let _ = self
+            .event_tx
+            .send(PlayerEvent::Snapshot(self.snapshot.clone()));
     }
 
     fn stop(&mut self) {
@@ -383,7 +381,9 @@ impl AudioEngine {
         self.snapshot.current = None;
         self.snapshot.queue_index = None;
         self.snapshot.queue_len = 0;
-        let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+        let _ = self
+            .event_tx
+            .send(PlayerEvent::Snapshot(self.snapshot.clone()));
     }
 
     // ── output device recovery ─────────────────────────────────
@@ -400,7 +400,8 @@ impl AudioEngine {
                 if self.snapshot.status == PlaybackStatus::Buffering {
                     self.snapshot.status = PlaybackStatus::Playing;
                 }
-                let _ = self.event_tx
+                let _ = self
+                    .event_tx
                     .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
             Err(err) => {
@@ -412,7 +413,8 @@ impl AudioEngine {
                     false,
                 );
                 self.finish_session(SessionEndReason::OutputError);
-                let _ = self.event_tx
+                let _ = self
+                    .event_tx
                     .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
         }
@@ -423,7 +425,9 @@ impl AudioEngine {
     fn start_current_track(&mut self) {
         let Some(track_id) = self.queue.as_ref().and_then(|q| q.current()) else {
             self.snapshot.status = PlaybackStatus::Ended;
-            let _ = self.event_tx.send(PlayerEvent::Snapshot(self.snapshot.clone()));
+            let _ = self
+                .event_tx
+                .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             return;
         };
         let Some(track) = self.tracks.iter().find(|t| t.id == track_id).cloned() else {
@@ -469,7 +473,8 @@ impl AudioEngine {
                                 &err.to_string(),
                                 false,
                             );
-                            let _ = self.event_tx
+                            let _ = self
+                                .event_tx
                                 .send(PlayerEvent::Snapshot(self.snapshot.clone()));
                             return;
                         }
@@ -491,9 +496,11 @@ impl AudioEngine {
                 self.snapshot.queue_index = self.queue.as_ref().and_then(|q| q.current_index());
                 self.snapshot.queue_len = self.queue.as_ref().map(|q| q.len()).unwrap_or(0);
                 self.last_tick = Instant::now();
-                let _ = self.event_tx
+                let _ = self
+                    .event_tx
                     .send(PlayerEvent::TrackChanged(self.snapshot.current.clone()));
-                let _ = self.event_tx
+                let _ = self
+                    .event_tx
                     .send(PlayerEvent::Snapshot(self.snapshot.clone()));
             }
             Err(err) => {
@@ -532,7 +539,8 @@ impl AudioEngine {
                 QueueMove::Ended => {
                     self.snapshot.status = PlaybackStatus::Ended;
                     self.snapshot.current = None;
-                    let _ = self.event_tx
+                    let _ = self
+                        .event_tx
                         .send(PlayerEvent::Snapshot(self.snapshot.clone()));
                 }
             }
@@ -553,7 +561,8 @@ impl AudioEngine {
                 QueueMove::Ended => {
                     self.snapshot.status = PlaybackStatus::Ended;
                     self.snapshot.current = None;
-                    let _ = self.event_tx
+                    let _ = self
+                        .event_tx
                         .send(PlayerEvent::Snapshot(self.snapshot.clone()));
                 }
             }
@@ -574,7 +583,8 @@ impl AudioEngine {
                 QueueMove::Ended => {
                     self.snapshot.status = PlaybackStatus::Ended;
                     self.snapshot.current = None;
-                    let _ = self.event_tx
+                    let _ = self
+                        .event_tx
                         .send(PlayerEvent::Snapshot(self.snapshot.clone()));
                 }
             }
@@ -713,8 +723,9 @@ mod tests {
         assert!(output_error_is_recoverable(0));
         assert!(!output_error_is_recoverable(1));
     }
+
+    fn output_error_is_recoverable(attempts: usize) -> bool {
+        attempts == 0
+    }
 }
 
-fn output_error_is_recoverable(attempts: usize) -> bool {
-    attempts == 0
-}

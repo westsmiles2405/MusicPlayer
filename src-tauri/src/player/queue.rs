@@ -52,18 +52,22 @@ impl PlayQueue {
         self.original.len()
     }
 
+    #[allow(dead_code)]
     pub fn repeat_mode(&self) -> RepeatMode {
         self.repeat_mode
     }
 
+    #[allow(dead_code)]
     pub fn shuffle(&self) -> bool {
         self.shuffle
     }
 
+    #[allow(dead_code)]
     pub fn set_repeat_mode(&mut self, mode: RepeatMode) {
         self.repeat_mode = mode;
     }
 
+    #[allow(dead_code)]
     pub fn set_shuffle(&mut self, enabled: bool) {
         if self.shuffle == enabled {
             return;
@@ -75,8 +79,8 @@ impl PlayQueue {
         } else {
             (0..self.original.len()).collect()
         };
-        self.index = current_track
-            .and_then(|id| self.order.iter().position(|&oi| self.original[oi] == id));
+        self.index =
+            current_track.and_then(|id| self.order.iter().position(|&oi| self.original[oi] == id));
     }
 
     pub fn next(&mut self) -> QueueMove {

@@ -36,10 +36,7 @@ pub async fn player_stop(manager: State<'_, PlayerManager>) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub async fn player_seek(
-    manager: State<'_, PlayerManager>,
-    position_ms: i64,
-) -> AppResult<()> {
+pub async fn player_seek(manager: State<'_, PlayerManager>, position_ms: i64) -> AppResult<()> {
     manager.send(PlayerCommand::Seek { position_ms })
 }
 
@@ -54,18 +51,12 @@ pub async fn player_previous(manager: State<'_, PlayerManager>) -> AppResult<()>
 }
 
 #[tauri::command]
-pub async fn player_set_volume(
-    manager: State<'_, PlayerManager>,
-    volume: f32,
-) -> AppResult<()> {
+pub async fn player_set_volume(manager: State<'_, PlayerManager>, volume: f32) -> AppResult<()> {
     manager.send(PlayerCommand::SetVolume { volume })
 }
 
 #[tauri::command]
-pub async fn player_set_muted(
-    manager: State<'_, PlayerManager>,
-    muted: bool,
-) -> AppResult<()> {
+pub async fn player_set_muted(manager: State<'_, PlayerManager>, muted: bool) -> AppResult<()> {
     manager.send(PlayerCommand::SetMuted { muted })
 }
 
@@ -97,10 +88,7 @@ pub async fn resume(manager: State<'_, PlayerManager>) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub async fn seek(
-    manager: State<'_, PlayerManager>,
-    position_ms: i64,
-) -> AppResult<()> {
+pub async fn seek(manager: State<'_, PlayerManager>, position_ms: i64) -> AppResult<()> {
     player_seek(manager, position_ms).await
 }
 
