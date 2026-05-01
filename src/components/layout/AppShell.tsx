@@ -1,11 +1,17 @@
 import { Outlet } from "react-router";
+import { MiniPlayer } from "@/components/player";
+import { ScanProgressBar } from "./ScanProgressBar";
+import { Sidebar } from "./Sidebar";
 
 export function AppShell() {
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1">
+    <div className="app-shell">
+      <Sidebar />
+      <main className="app-shell__main">
         <Outlet />
-      </div>
+      </main>
+      <MiniPlayer />
+      <ScanProgressBar />
     </div>
   );
 }

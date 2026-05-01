@@ -1,45 +1,34 @@
-import { Routes, Route, Link, useLocation } from "react-router";
-import { ScanProgressBar } from "@/components/layout/ScanProgressBar";
-import LibraryPage from "@/pages/LibraryPage";
+import { Route, Routes } from "react-router";
+import { AppShell } from "@/components/layout";
+import RecentPage from "@/pages/RecentPage";
+import SongsPage from "@/pages/SongsPage";
+import AlbumsPage from "@/pages/AlbumsPage";
+import AlbumDetailPage from "@/pages/AlbumDetailPage";
+import ArtistsPage from "@/pages/ArtistsPage";
+import ArtistDetailPage from "@/pages/ArtistDetailPage";
+import PlaylistsPage from "@/pages/PlaylistsPage";
+import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import SettingsPage from "@/pages/SettingsPage";
-
-function Nav() {
-  const { pathname } = useLocation();
-  return (
-    <nav className="flex gap-4 px-8 py-3 text-sm border-b border-white/10 bg-black/60 backdrop-blur-md">
-      <Link
-        to="/"
-        className={
-          pathname === "/"
-            ? "text-white font-medium"
-            : "text-white/60 hover:text-white"
-        }
-      >
-        资料库
-      </Link>
-      <Link
-        to="/settings"
-        className={
-          pathname === "/settings"
-            ? "text-white font-medium"
-            : "text-white/60 hover:text-white"
-        }
-      >
-        设置
-      </Link>
-    </nav>
-  );
-}
+import NotFoundRedirect from "@/pages/NotFoundRedirect";
 
 export default function App() {
   return (
-    <>
-      <Nav />
-      <Routes>
-        <Route path="/" element={<LibraryPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-      </Routes>
-      <ScanProgressBar />
-    </>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<NotFoundRedirect />} />
+        <Route path="library">
+          <Route path="recent" element={<RecentPage />} />
+          <Route path="songs" element={<SongsPage />} />
+          <Route path="albums" element={<AlbumsPage />} />
+          <Route path="albums/:id" element={<AlbumDetailPage />} />
+          <Route path="artists" element={<ArtistsPage />} />
+          <Route path="artists/:id" element={<ArtistDetailPage />} />
+        </Route>
+        <Route path="playlists" element={<PlaylistsPage />} />
+        <Route path="playlists/:id" element={<PlaylistDetailPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<NotFoundRedirect />} />
+      </Route>
+    </Routes>
   );
 }

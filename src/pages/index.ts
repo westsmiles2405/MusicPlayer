@@ -1,2 +1,11 @@
 export { default as LibraryPage } from "./LibraryPage";
 export { default as SettingsPage } from "./SettingsPage";
+export { default as RecentPage } from "./RecentPage";
+export { default as SongsPage } from "./SongsPage";
+export { default as AlbumsPage } from "./AlbumsPage";
+export { default as AlbumDetailPage } from "./AlbumDetailPage";
+export { default as ArtistsPage } from "./ArtistsPage";
+export { default as ArtistDetailPage } from "./ArtistDetailPage";
+export { default as PlaylistsPage } from "./PlaylistsPage";
+export { default as PlaylistDetailPage } from "./PlaylistDetailPage";
+export { default as NotFoundRedirect } from "./NotFoundRedirect";
