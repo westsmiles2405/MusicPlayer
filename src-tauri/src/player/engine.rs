@@ -558,7 +558,21 @@ impl AudioEngine {
     }
 
     fn finish_session(&mut self, reason: SessionEndReason) {
-        self.gapless.cancel();
+        // Only cancel gapless when the predecode result is invalidated.
+        // Completed / Next / Previous feed into advance_next() which
+        // needs the predecoded result still alive.
+        if matches!(
+            reason,
+            SessionEndReason::Stop
+                | SessionEndReason::Replaced
+                | SessionEndReason::DecodeError
+                | SessionEndReason::OutputError
+                | SessionEndReason::FileMissing
+                | SessionEndReason::PermissionDenied
+                | SessionEndReason::Shutdown
+        ) {
+            self.gapless.cancel();
+        }
         if let Some(session) = self.session.take() {
             let _ = self.event_tx.send(PlayerEvent::SessionEnded {
                 session,
@@ -715,6 +729,16 @@ impl AudioEngine {
 
         // Push leftover samples from the previous partial write first.
         self.flush_pending();
+
+        // If pending still isn't empty the ringbuf is still full —
+        // skip decoder this tick so audio device has time to drain.
+        if !self.pending_samples.is_empty() {
+            let _ = self.event_tx.send(PlayerEvent::Progress {
+                position_ms: self.snapshot.position_ms,
+                duration_ms: self.snapshot.duration_ms,
+            });
+            return;
+        }
 
         if let Some(ref mut decoder) = self.decoder {
             for _ in 0..4 {
