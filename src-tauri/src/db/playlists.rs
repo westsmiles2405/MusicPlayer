@@ -1,6 +1,6 @@
 //! Playlist queries.
 
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{params, Connection, Row};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
