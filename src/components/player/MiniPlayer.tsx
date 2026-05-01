@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { usePlayer } from "@/hooks/usePlayer";
+import { useUIStore } from "@/stores/uiStore";
 import { selectDisplayPositionMs, usePlayerStore } from "@/stores/playerStore";
 
 function formatTime(ms: number) {
@@ -19,6 +20,7 @@ function formatTime(ms: number) {
 
 export function MiniPlayer() {
   const player = usePlayer();
+  const openNowPlaying = useUIStore((s) => s.openNowPlaying);
   const displayPosition = usePlayerStore(selectDisplayPositionMs);
   const title = player.current?.title ?? "未播放";
   const subtitle = [player.current?.artistName, player.current?.albumName]
@@ -37,7 +39,7 @@ export function MiniPlayer() {
 
   return (
     <footer className="mini-player" aria-label="播放器">
-      <div className="mini-player__track">
+      <div className="mini-player__track" role="button" tabIndex={0} onClick={openNowPlaying} onKeyDown={(e) => { if (e.key === "Enter") openNowPlaying(); }}>
         <div className="mini-player__art" aria-hidden="true" />
         <div className="mini-player__meta">
           <div className="mini-player__title">{title}</div>
