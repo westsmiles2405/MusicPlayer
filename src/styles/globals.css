@@ -426,3 +426,21 @@ body,
     grid-column: 1;
   }
 }
+
+/* ── search ──────────────────────────────────────────────── */
+
+.search-input {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.search-input input {
+  width: 100%;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+}
+
+.search-results {
+  display: grid;
+  gap: 1.5rem;
+}
