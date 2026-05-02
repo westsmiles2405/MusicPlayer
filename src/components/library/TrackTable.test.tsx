@@ -107,4 +107,19 @@ describe("TrackTable", () => {
       screen.getByRole("button", { name: "取消收藏" }),
     ).toBeInTheDocument();
   });
+
+  it("renders empty list without error", () => {
+    render(<TrackTable tracks={[]} queueContext="songs" />);
+    expect(screen.queryAllByTestId("track-row")).toHaveLength(0);
+  });
+
+  it("renders correct number of rows", () => {
+    const tracks = [
+      baseTrack,
+      { ...baseTrack, id: 2, title: "B" },
+      { ...baseTrack, id: 3, title: "C" },
+    ];
+    render(<TrackTable tracks={tracks} queueContext="songs" />);
+    expect(screen.getAllByTestId("track-row")).toHaveLength(3);
+  });
 });

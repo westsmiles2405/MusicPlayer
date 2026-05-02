@@ -106,4 +106,15 @@ describe("useKeyboardShortcuts", () => {
     );
     expect(useUIStore.getState().isNowPlayingOpen).toBe(false);
   });
+
+  it("space does not toggle when textarea is focused", async () => {
+    const { useKeyboardShortcuts } = await import("./useKeyboardShortcuts");
+    const textarea = document.createElement("textarea");
+    document.body.appendChild(textarea);
+    textarea.focus();
+    renderHook(() => useKeyboardShortcuts(), { wrapper });
+    textarea.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    expect(toggle).not.toHaveBeenCalled();
+    textarea.remove();
+  });
 });

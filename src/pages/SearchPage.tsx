@@ -55,6 +55,7 @@ export default function SearchPage() {
         <input
           type="text"
           aria-label="搜索"
+          data-testid="search-input"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜索歌曲、专辑、艺人或播放列表"

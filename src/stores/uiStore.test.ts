@@ -29,4 +29,28 @@ describe("uiStore", () => {
     useUIStore.getState().setResolvedTheme("dark");
     expect(useUIStore.getState().resolvedTheme).toBe("dark");
   });
+
+  it("toggleNowPlaying cycles correctly", () => {
+    const store = useUIStore.getState();
+    store.toggleNowPlaying();
+    expect(useUIStore.getState().isNowPlayingOpen).toBe(true);
+    store.toggleNowPlaying();
+    expect(useUIStore.getState().isNowPlayingOpen).toBe(false);
+    store.toggleNowPlaying();
+    expect(useUIStore.getState().isNowPlayingOpen).toBe(true);
+  });
+
+  it("setResolvedTheme updates correctly", () => {
+    useUIStore.getState().setResolvedTheme("dark");
+    expect(useUIStore.getState().resolvedTheme).toBe("dark");
+    useUIStore.getState().setResolvedTheme("light");
+    expect(useUIStore.getState().resolvedTheme).toBe("light");
+  });
+
+  it("initial state is correct", () => {
+    expect(useUIStore.getState().isNowPlayingOpen).toBe(false);
+    expect(useUIStore.getState().sidebarCollapsed).toBe(false);
+    expect(useUIStore.getState().theme).toBe("system");
+    expect(useUIStore.getState().resolvedTheme).toBe("light");
+  });
 });
