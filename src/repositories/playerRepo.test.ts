@@ -25,4 +25,22 @@ describe("playerRepo", () => {
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "player_toggle_mute");
   });
+
+  it("sends player_next command", async () => {
+    const { playerRepo } = await import("@/repositories/playerRepo");
+    await playerRepo.next();
+    expect(invoke).toHaveBeenCalledWith("player_next");
+  });
+
+  it("sends player_previous command", async () => {
+    const { playerRepo } = await import("@/repositories/playerRepo");
+    await playerRepo.previous();
+    expect(invoke).toHaveBeenCalledWith("player_previous");
+  });
+
+  it("sends player_seek with position", async () => {
+    const { playerRepo } = await import("@/repositories/playerRepo");
+    await playerRepo.seek(5000);
+    expect(invoke).toHaveBeenCalledWith("player_seek", { positionMs: 5000 });
+  });
 });
