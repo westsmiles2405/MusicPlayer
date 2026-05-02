@@ -120,4 +120,29 @@ describe("NowPlayingOverlay", () => {
     });
     expect(screen.getByText("暂无播放内容")).toBeInTheDocument();
   });
+
+  it("renders volume slider", async () => {
+    const { NowPlayingOverlay } = await import("./NowPlayingOverlay");
+    await act(async () => {
+      render(<NowPlayingOverlay open onClose={() => {}} />, { wrapper });
+    });
+    expect(screen.getByRole("slider", { name: "音量" })).toBeInTheDocument();
+  });
+
+  it("renders progress slider", async () => {
+    const { NowPlayingOverlay } = await import("./NowPlayingOverlay");
+    await act(async () => {
+      render(<NowPlayingOverlay open onClose={() => {}} />, { wrapper });
+    });
+    expect(screen.getByRole("slider", { name: "播放进度" })).toBeInTheDocument();
+  });
+
+  it("renders play/pause button", async () => {
+    const { NowPlayingOverlay } = await import("./NowPlayingOverlay");
+    await act(async () => {
+      render(<NowPlayingOverlay open onClose={() => {}} />, { wrapper });
+    });
+    // The mock returns status: "playing", so button should say "暂停"
+    expect(screen.getByRole("button", { name: "暂停" })).toBeInTheDocument();
+  });
 });
