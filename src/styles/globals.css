@@ -682,3 +682,18 @@ body,
 .mini-player__track:hover {
   opacity: 0.85;
 }
+
+/* ── Click target sizes (a11y) ──────────────────────────── */
+
+.mini-player button,
+.now-playing__controls button,
+.now-playing__header button,
+.now-playing__volume button {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.now-playing__play-main {
+  min-width: 44px;
+  min-height: 44px;
+}
