@@ -52,7 +52,7 @@ const invoke = vi.fn((cmd: string) => {
     repeatMode: "off",
     shuffle: false,
   });
-});
+}) as any;
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
 const listen = vi.fn().mockResolvedValue(() => {});
@@ -340,9 +340,7 @@ describe("E2E integration flows", () => {
       });
     });
 
-    const { default: PlaylistsPage } = await import(
-      "@/pages/PlaylistsPage"
-    );
+    const { default: PlaylistsPage } = await import("@/pages/PlaylistsPage");
     await act(async () => {
       render(<PlaylistsPage />, { wrapper });
     });
@@ -376,9 +374,8 @@ describe("E2E integration flows", () => {
 
   // -- Flow 5: Now Playing ---------------------------------------------------
   it("now playing: overlay opens and shows track info", async () => {
-    const { NowPlayingOverlay } = await import(
-      "@/components/player/NowPlayingOverlay"
-    );
+    const { NowPlayingOverlay } =
+      await import("@/components/player/NowPlayingOverlay");
 
     // Override usePlayer for this test to return active playback state
     usePlayerMock.mockReturnValue({
@@ -411,7 +408,7 @@ describe("E2E integration flows", () => {
       setVolume: vi.fn(),
       setMuted: vi.fn(),
       toggleMute: vi.fn(),
-    });
+    } as any);
 
     const onClose = vi.fn();
 
@@ -428,20 +425,12 @@ describe("E2E integration flows", () => {
     expect(screen.getByText("Now Playing Album")).toBeInTheDocument();
 
     // Control buttons should exist
-    expect(
-      screen.getByRole("button", { name: "上一首" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "暂停" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "下一首" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "上一首" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "暂停" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "下一首" })).toBeInTheDocument();
 
     // Close button should work
-    fireEvent.click(
-      screen.getByRole("button", { name: "关闭 Now Playing" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "关闭 Now Playing" }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
