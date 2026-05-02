@@ -39,10 +39,7 @@ function TrackRow({
   renderActions?: (row: TrackTableRow) => React.ReactNode;
 }) {
   return (
-    <tr
-      data-testid="track-row"
-      data-missing={row.missingAt !== null}
-    >
+    <tr data-testid="track-row" data-missing={row.missingAt !== null}>
       <td>{row.title}</td>
       <td>{row.primaryArtistName ?? "未知艺人"}</td>
       <td>{row.albumName ?? "未知专辑"}</td>
@@ -55,11 +52,7 @@ function TrackRow({
             onClick={() => onToggleFavorite(row)}
             aria-label={row.isFavorite ? "取消收藏" : "收藏"}
           >
-            {row.isFavoritePending
-              ? "..."
-              : row.isFavorite
-                ? "已喜欢"
-                : "喜欢"}
+            {row.isFavoritePending ? "..." : row.isFavorite ? "已喜欢" : "喜欢"}
           </button>
         )}
         <button

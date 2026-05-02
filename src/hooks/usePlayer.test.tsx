@@ -75,7 +75,9 @@ describe("usePlayer", () => {
 
   it("exposes play function", async () => {
     const { usePlayer } = await import("@/hooks/usePlayer");
-    const { result } = renderHook(() => usePlayer(), { wrapper: makeWrapper() });
+    const { result } = renderHook(() => usePlayer(), {
+      wrapper: makeWrapper(),
+    });
     expect(typeof result.current.play).toBe("function");
     expect(typeof result.current.toggle).toBe("function");
     expect(typeof result.current.pause).toBe("function");
@@ -83,7 +85,9 @@ describe("usePlayer", () => {
 
   it("exposes volume controls", async () => {
     const { usePlayer } = await import("@/hooks/usePlayer");
-    const { result } = renderHook(() => usePlayer(), { wrapper: makeWrapper() });
+    const { result } = renderHook(() => usePlayer(), {
+      wrapper: makeWrapper(),
+    });
     expect(typeof result.current.setVolume).toBe("function");
     expect(typeof result.current.toggleMute).toBe("function");
     expect(typeof result.current.setMuted).toBe("function");
@@ -91,7 +95,9 @@ describe("usePlayer", () => {
 
   it("exposes navigation functions", async () => {
     const { usePlayer } = await import("@/hooks/usePlayer");
-    const { result } = renderHook(() => usePlayer(), { wrapper: makeWrapper() });
+    const { result } = renderHook(() => usePlayer(), {
+      wrapper: makeWrapper(),
+    });
     expect(typeof result.current.next).toBe("function");
     expect(typeof result.current.previous).toBe("function");
     expect(typeof result.current.seek).toBe("function");
