@@ -17,4 +17,14 @@ describe("CoverArt", () => {
       "cover-art--placeholder",
     );
   });
+
+  it("renders with sm size class", () => {
+    render(<CoverArt coverPath={null} title="Album" size="sm" />);
+    expect(screen.getByRole("img")).toHaveClass("cover-art--sm");
+  });
+
+  it("renders with lg size class", () => {
+    render(<CoverArt coverPath={null} title="Album" size="lg" />);
+    expect(screen.getByRole("img")).toHaveClass("cover-art--lg");
+  });
 });
