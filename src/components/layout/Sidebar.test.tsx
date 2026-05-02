@@ -41,4 +41,17 @@ describe("Sidebar", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "设置" })).toBeInTheDocument();
   });
+
+  it("renders create playlist button", async () => {
+    const { Sidebar } = await import("./Sidebar");
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Sidebar />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("button", { name: "创建播放列表" })).toBeInTheDocument();
+  });
 });
