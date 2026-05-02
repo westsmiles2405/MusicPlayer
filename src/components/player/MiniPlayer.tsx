@@ -39,7 +39,15 @@ export function MiniPlayer() {
 
   return (
     <footer className="mini-player" aria-label="播放器">
-      <div className="mini-player__track" role="button" tabIndex={0} onClick={openNowPlaying} onKeyDown={(e) => { if (e.key === "Enter") openNowPlaying(); }}>
+      <div
+        className="mini-player__track"
+        role="button"
+        tabIndex={0}
+        onClick={openNowPlaying}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") openNowPlaying();
+        }}
+      >
         <div className="mini-player__art" aria-hidden="true" />
         <div className="mini-player__meta">
           <div className="mini-player__title">{title}</div>

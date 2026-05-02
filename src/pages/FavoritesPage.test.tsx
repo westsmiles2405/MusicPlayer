@@ -30,8 +30,6 @@ describe("FavoritesPage", () => {
         </QueryClientProvider>,
       );
     });
-    expect(
-      await screen.findByText("还没有喜欢的歌曲"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("还没有喜欢的歌曲")).toBeInTheDocument();
   });
 });

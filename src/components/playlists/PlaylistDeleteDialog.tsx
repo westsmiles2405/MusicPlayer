@@ -40,9 +40,7 @@ export function PlaylistDeleteDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="dialog__title">删除播放列表</h2>
-        <p>
-          确定要删除播放列表「{playlistName}」吗？此操作不可撤销。
-        </p>
+        <p>确定要删除播放列表「{playlistName}」吗？此操作不可撤销。</p>
         {error && <p className="dialog__error">{error}</p>}
         <div className="dialog__actions">
           <button type="button" onClick={onClose} disabled={submitting}>

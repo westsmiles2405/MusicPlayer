@@ -30,8 +30,6 @@ describe("RecentPlaysPage", () => {
         </QueryClientProvider>,
       );
     });
-    expect(
-      await screen.findByText("还没有最近播放记录"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("还没有最近播放记录")).toBeInTheDocument();
   });
 });

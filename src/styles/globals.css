@@ -160,9 +160,21 @@ body,
   background: #d8d8de;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
-.cover-art--sm { width: 40px; height: 40px; border-radius: 6px; }
-.cover-art--md { width: 96px; height: 96px; border-radius: 8px; }
-.cover-art--lg { width: 176px; height: 176px; border-radius: 10px; }
+.cover-art--sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+}
+.cover-art--md {
+  width: 96px;
+  height: 96px;
+  border-radius: 8px;
+}
+.cover-art--lg {
+  width: 176px;
+  height: 176px;
+  border-radius: 10px;
+}
 
 .album-grid {
   display: grid;
@@ -173,7 +185,9 @@ body,
   cursor: pointer;
   text-align: center;
 }
-.album-grid__item:hover { opacity: 0.8; }
+.album-grid__item:hover {
+  opacity: 0.8;
+}
 
 .artist-list {
   display: flex;
@@ -185,7 +199,9 @@ body,
   border-radius: 6px;
   cursor: pointer;
 }
-.artist-list__item:hover { background: rgba(0, 0, 0, 0.04); }
+.artist-list__item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
 
 .page-header {
   display: flex;
@@ -208,7 +224,11 @@ body,
   text-align: center;
   color: var(--color-muted, #9a9a9a);
 }
-.state h2 { font-size: 18px; margin: 0 0 8px; color: CanvasText; }
+.state h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+  color: CanvasText;
+}
 
 /* ── Dialog ──────────────────────────────────────────────────── */
 

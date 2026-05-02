@@ -1,5 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX, X } from "lucide-react";
+import {
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
 import { usePlayer } from "@/hooks/usePlayer";
 import { selectDisplayPositionMs, usePlayerStore } from "@/stores/playerStore";
 
@@ -143,11 +151,7 @@ export function NowPlayingOverlay({
                   onClick={player.toggleMute}
                   aria-label={player.muted ? "取消静音" : "静音"}
                 >
-                  {player.muted ? (
-                    <VolumeX size={18} />
-                  ) : (
-                    <Volume2 size={18} />
-                  )}
+                  {player.muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>
                 <input
                   aria-label="音量"

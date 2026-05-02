@@ -42,7 +42,9 @@ export default function RecentPlaysPage() {
 
   const tracks = useMemo(
     () =>
-      recentPlays.data?.map(({ lastPlayedAt: _lastPlayedAt, ...track }): Track => track as Track) ?? [],
+      recentPlays.data?.map(
+        ({ lastPlayedAt: _lastPlayedAt, ...track }): Track => track as Track,
+      ) ?? [],
     [recentPlays.data],
   );
 

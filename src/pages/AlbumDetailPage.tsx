@@ -31,11 +31,18 @@ export default function AlbumDetailPage() {
   });
 
   const addToPlaylist = useMutation({
-    mutationFn: ({ trackId, playlistId }: { trackId: number; playlistId: number }) =>
-      playlistRepo.addTrack(playlistId, trackId),
+    mutationFn: ({
+      trackId,
+      playlistId,
+    }: {
+      trackId: number;
+      playlistId: number;
+    }) => playlistRepo.addTrack(playlistId, trackId),
     onSuccess: (_pos, vars) => {
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
-      queryClient.invalidateQueries({ queryKey: ["playlistTracks", vars.playlistId] });
+      queryClient.invalidateQueries({
+        queryKey: ["playlistTracks", vars.playlistId],
+      });
     },
   });
 
@@ -45,7 +52,9 @@ export default function AlbumDetailPage() {
   return (
     <>
       {album.isLoading && <LoadingState title="加载中" />}
-      {album.isError && <ErrorState message={album.error?.message ?? "加载失败"} />}
+      {album.isError && (
+        <ErrorState message={album.error?.message ?? "加载失败"} />
+      )}
       {album.data && (
         <>
           <div className="flex items-center gap-4 mb-4">
@@ -59,7 +68,11 @@ export default function AlbumDetailPage() {
               onClick={() => {
                 const [first] = playable;
                 if (!first) return;
-                player.play(first.id, playable.map((t) => t.id), 0);
+                player.play(
+                  first.id,
+                  playable.map((t) => t.id),
+                  0,
+                );
               }}
               aria-label="播放专辑"
             >

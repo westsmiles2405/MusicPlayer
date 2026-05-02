@@ -4,7 +4,12 @@ import { useNavigate } from "react-router";
 import { playlistRepo } from "@/repositories/playlistRepo";
 import { useCreatePlaylistMutation } from "@/hooks/useCreatePlaylistMutation";
 import { PlaylistCreateDialog } from "@/components/playlists";
-import { PageHeader, EmptyState, LoadingState, ErrorState } from "@/components/layout";
+import {
+  PageHeader,
+  EmptyState,
+  LoadingState,
+  ErrorState,
+} from "@/components/layout";
 
 export default function PlaylistsPage() {
   const navigate = useNavigate();
@@ -32,7 +37,10 @@ export default function PlaylistsPage() {
         <ErrorState message={playlists.error?.message ?? "加载失败"} />
       )}
       {playlists.data?.length === 0 && (
-        <EmptyState title="没有播放列表" description="创建播放列表来整理你的音乐" />
+        <EmptyState
+          title="没有播放列表"
+          description="创建播放列表来整理你的音乐"
+        />
       )}
       {playlists.data && playlists.data.length > 0 && (
         <ul className="playlist-list">

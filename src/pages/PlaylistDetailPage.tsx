@@ -3,8 +3,16 @@ import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { playlistRepo } from "@/repositories/playlistRepo";
 import { TrackTable } from "@/components/library/TrackTable";
-import { PageHeader, LoadingState, ErrorState, EmptyState } from "@/components/layout";
-import { PlaylistRenameDialog, PlaylistDeleteDialog } from "@/components/playlists";
+import {
+  PageHeader,
+  LoadingState,
+  ErrorState,
+  EmptyState,
+} from "@/components/layout";
+import {
+  PlaylistRenameDialog,
+  PlaylistDeleteDialog,
+} from "@/components/playlists";
 import { usePlayer } from "@/hooks/usePlayer";
 
 export default function PlaylistDetailPage() {
@@ -55,7 +63,9 @@ export default function PlaylistDetailPage() {
       position: number;
     }) => playlistRepo.removeTrack(playlistId, trackId, position),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["playlistTracks", playlistId] });
+      queryClient.invalidateQueries({
+        queryKey: ["playlistTracks", playlistId],
+      });
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
     },
   });
@@ -69,7 +79,9 @@ export default function PlaylistDetailPage() {
       destinationPosition: number;
     }) => playlistRepo.reorder(playlistId, sourcePosition, destinationPosition),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["playlistTracks", playlistId] });
+      queryClient.invalidateQueries({
+        queryKey: ["playlistTracks", playlistId],
+      });
     },
   });
 
@@ -86,9 +98,7 @@ export default function PlaylistDetailPage() {
       {playlists.isError && (
         <ErrorState message={playlists.error?.message ?? "加载失败"} />
       )}
-      {playlists.data && !playlist && (
-        <ErrorState message="播放列表不存在" />
-      )}
+      {playlists.data && !playlist && <ErrorState message="播放列表不存在" />}
       {playlist && (
         <>
           <PageHeader
@@ -125,7 +135,10 @@ export default function PlaylistDetailPage() {
             <ErrorState message={tracks.error?.message ?? "加载失败"} />
           )}
           {tracks.data?.length === 0 && (
-            <EmptyState title="播放列表为空" description="从歌曲页面添加音乐到此播放列表" />
+            <EmptyState
+              title="播放列表为空"
+              description="从歌曲页面添加音乐到此播放列表"
+            />
           )}
           {tracks.data && tracks.data.length > 0 && (
             <TrackTable

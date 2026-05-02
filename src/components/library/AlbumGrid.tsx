@@ -31,16 +31,18 @@ export function AlbumGrid({ albums, onOpen }: AlbumGridProps) {
           onClick={() => onOpen(album.id)}
           type="button"
         >
-          <CoverArt
-            coverPath={album.coverPath}
-            title={album.name}
-            size="md"
-          />
+          <CoverArt coverPath={album.coverPath} title={album.name} size="md" />
           <p style={{ margin: "8px 0 2px", fontWeight: 600, fontSize: 14 }}>
             {album.name}
           </p>
           {album.albumArtistName && (
-            <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted, #9a9a9a)" }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "var(--color-muted, #9a9a9a)",
+              }}
+            >
               {album.albumArtistName}
             </p>
           )}

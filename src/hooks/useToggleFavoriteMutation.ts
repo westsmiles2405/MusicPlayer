@@ -45,12 +45,8 @@ function patchAllTrackCaches(
   // recentPlays 缓存: (Track & { lastPlayedAt })[]
   queryClient.setQueriesData(
     { queryKey: ["recentPlays"] },
-    (
-      old: (Track & { lastPlayedAt: number })[] | undefined,
-    ) =>
-      old?.map((t) =>
-        t.id === trackId ? patchIsFavorite(t, favorite) : t,
-      ),
+    (old: (Track & { lastPlayedAt: number })[] | undefined) =>
+      old?.map((t) => (t.id === trackId ? patchIsFavorite(t, favorite) : t)),
   );
 }
 
@@ -73,18 +69,15 @@ export function useToggleFavoriteMutation() {
       ]);
 
       // 乐观更新: favoriteTracks 列表
-      queryClient.setQueryData<Track[]>(
-        ["favoriteTracks"],
-        (current = []) => {
-          if (favorite) {
-            const exists = current.some((item) => item.id === track.id);
-            return exists
-              ? current
-              : [{ ...track, isFavorite: true }, ...current];
-          }
-          return current.filter((item) => item.id !== track.id);
-        },
-      );
+      queryClient.setQueryData<Track[]>(["favoriteTracks"], (current = []) => {
+        if (favorite) {
+          const exists = current.some((item) => item.id === track.id);
+          return exists
+            ? current
+            : [{ ...track, isFavorite: true }, ...current];
+        }
+        return current.filter((item) => item.id !== track.id);
+      });
 
       // 乐观更新: 所有 track-bearing 缓存中的 isFavorite 字段
       patchAllTrackCaches(queryClient, track.id, favorite);
@@ -94,10 +87,7 @@ export function useToggleFavoriteMutation() {
     onError: (_error, _vars, context) => {
       // 回滚 favoriteTracks
       if (context?.previousFavorites) {
-        queryClient.setQueryData(
-          ["favoriteTracks"],
-          context.previousFavorites,
-        );
+        queryClient.setQueryData(["favoriteTracks"], context.previousFavorites);
       }
       // 回滚所有 track 缓存（翻转 isFavorite 回原值）
       // 因为 onMutate 里已经改了，refetch 会自动修正，但这里显式回滚更安全

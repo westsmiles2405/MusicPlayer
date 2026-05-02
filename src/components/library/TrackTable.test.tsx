@@ -73,9 +73,7 @@ describe("TrackTable", () => {
         onToggleFavorite={onToggleFavorite}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "收藏" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "收藏" })).toBeInTheDocument();
   });
 
   it("calls onToggleFavorite with next favorite value", () => {

@@ -31,11 +31,18 @@ export default function ArtistDetailPage() {
   });
 
   const addToPlaylist = useMutation({
-    mutationFn: ({ trackId, playlistId }: { trackId: number; playlistId: number }) =>
-      playlistRepo.addTrack(playlistId, trackId),
+    mutationFn: ({
+      trackId,
+      playlistId,
+    }: {
+      trackId: number;
+      playlistId: number;
+    }) => playlistRepo.addTrack(playlistId, trackId),
     onSuccess: (_pos, vars) => {
       queryClient.invalidateQueries({ queryKey: ["playlists"] });
-      queryClient.invalidateQueries({ queryKey: ["playlistTracks", vars.playlistId] });
+      queryClient.invalidateQueries({
+        queryKey: ["playlistTracks", vars.playlistId],
+      });
     },
   });
 
@@ -44,7 +51,9 @@ export default function ArtistDetailPage() {
   return (
     <>
       {artist.isLoading && <LoadingState title="加载中" />}
-      {artist.isError && <ErrorState message={artist.error?.message ?? "加载失败"} />}
+      {artist.isError && (
+        <ErrorState message={artist.error?.message ?? "加载失败"} />
+      )}
       {artist.data && (
         <>
           <PageHeader
@@ -56,7 +65,11 @@ export default function ArtistDetailPage() {
                 onClick={() => {
                   const [first] = playable;
                   if (!first) return;
-                  player.play(first.id, playable.map((t) => t.id), 0);
+                  player.play(
+                    first.id,
+                    playable.map((t) => t.id),
+                    0,
+                  );
                 }}
               >
                 播放全部
