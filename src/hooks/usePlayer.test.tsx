@@ -12,7 +12,8 @@ const listen = vi
   .mockResolvedValueOnce(unlistenA)
   .mockResolvedValueOnce(unlistenB)
   .mockResolvedValueOnce(unlistenC)
-  .mockResolvedValueOnce(unlistenD);
+  .mockResolvedValueOnce(unlistenD)
+  .mockResolvedValue(vi.fn());
 
 vi.mock("@tauri-apps/api/event", () => ({ listen }));
 vi.mock("@/repositories/playerRepo", () => ({
@@ -59,5 +60,40 @@ describe("usePlayerEvents", () => {
     expect(unlistenA).toHaveBeenCalled();
     expect(unlistenB).toHaveBeenCalled();
     expect(unlistenC).toHaveBeenCalled();
+  });
+});
+
+describe("usePlayer", () => {
+  function makeWrapper() {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+  }
+
+  it("exposes play function", async () => {
+    const { usePlayer } = await import("@/hooks/usePlayer");
+    const { result } = renderHook(() => usePlayer(), { wrapper: makeWrapper() });
+    expect(typeof result.current.play).toBe("function");
+    expect(typeof result.current.toggle).toBe("function");
+    expect(typeof result.current.pause).toBe("function");
+  });
+
+  it("exposes volume controls", async () => {
+    const { usePlayer } = await import("@/hooks/usePlayer");
+    const { result } = renderHook(() => usePlayer(), { wrapper: makeWrapper() });
+    expect(typeof result.current.setVolume).toBe("function");
+    expect(typeof result.current.toggleMute).toBe("function");
+    expect(typeof result.current.setMuted).toBe("function");
+  });
+
+  it("exposes navigation functions", async () => {
+    const { usePlayer } = await import("@/hooks/usePlayer");
+    const { result } = renderHook(() => usePlayer(), { wrapper: makeWrapper() });
+    expect(typeof result.current.next).toBe("function");
+    expect(typeof result.current.previous).toBe("function");
+    expect(typeof result.current.seek).toBe("function");
   });
 });
