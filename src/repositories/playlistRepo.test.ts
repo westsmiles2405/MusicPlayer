@@ -23,4 +23,29 @@ describe("playlistRepo", () => {
       destinationPosition: 2,
     });
   });
+
+  it("calls create_playlist", async () => {
+    const { playlistRepo } = await import("./playlistRepo");
+    invoke.mockResolvedValueOnce(1);
+    await playlistRepo.create("New Playlist");
+    expect(invoke).toHaveBeenCalledWith("create_playlist", {
+      name: "New Playlist",
+      description: null,
+    });
+  });
+
+  it("calls rename_playlist", async () => {
+    const { playlistRepo } = await import("./playlistRepo");
+    await playlistRepo.rename(1, "Renamed");
+    expect(invoke).toHaveBeenCalledWith("rename_playlist", {
+      playlistId: 1,
+      name: "Renamed",
+    });
+  });
+
+  it("calls delete_playlist", async () => {
+    const { playlistRepo } = await import("./playlistRepo");
+    await playlistRepo.delete(1);
+    expect(invoke).toHaveBeenCalledWith("delete_playlist", { playlistId: 1 });
+  });
 });
