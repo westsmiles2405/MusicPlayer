@@ -134,7 +134,9 @@ describe("NowPlayingOverlay", () => {
     await act(async () => {
       render(<NowPlayingOverlay open onClose={() => {}} />, { wrapper });
     });
-    expect(screen.getByRole("slider", { name: "播放进度" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("slider", { name: "播放进度" }),
+    ).toBeInTheDocument();
   });
 
   it("renders play/pause button", async () => {

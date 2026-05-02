@@ -1,10 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  act,
-  cleanup,
-  render,
-  screen,
-} from "@testing-library/react/pure";
+import { act, cleanup, render, screen } from "@testing-library/react/pure";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,9 +54,7 @@ describe("RecentPlaysPage", () => {
     await act(async () => {
       render(<RecentPlaysPage />, { wrapper });
     });
-    expect(
-      await screen.findByText("还没有最近播放记录"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("还没有最近播放记录")).toBeInTheDocument();
   });
 
   it("renders recent plays list", async () => {
@@ -115,7 +108,10 @@ describe("RecentPlaysPage", () => {
     vi.useFakeTimers();
     let rejectList!: (reason: unknown) => void;
     list.mockImplementation(
-      () => new Promise((_resolve, reject) => { rejectList = reject; }),
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectList = reject;
+        }),
     );
     const { default: RecentPlaysPage } = await import("./RecentPlaysPage");
     render(<RecentPlaysPage />, { wrapper });

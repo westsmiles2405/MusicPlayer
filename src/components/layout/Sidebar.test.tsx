@@ -44,7 +44,9 @@ describe("Sidebar", () => {
 
   it("renders create playlist button", async () => {
     const { Sidebar } = await import("./Sidebar");
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     render(
       <QueryClientProvider client={qc}>
         <MemoryRouter>
@@ -52,6 +54,8 @@ describe("Sidebar", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("button", { name: "创建播放列表" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "创建播放列表" }),
+    ).toBeInTheDocument();
   });
 });

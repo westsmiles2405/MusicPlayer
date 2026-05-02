@@ -47,7 +47,7 @@ const baseTrack: Track = {
 
 describe("useToggleFavoriteMutation", () => {
   let qc: QueryClient;
-  let wrapper: ({ children }: { children: ReactNode }) => JSX.Element;
+  let wrapper: ({ children }: { children: ReactNode }) => React.ReactElement;
 
   beforeEach(() => {
     setFavorite.mockClear();
@@ -63,9 +63,8 @@ describe("useToggleFavoriteMutation", () => {
   });
 
   it("calls favoriteRepo.set with correct args", async () => {
-    const { useToggleFavoriteMutation } = await import(
-      "./useToggleFavoriteMutation"
-    );
+    const { useToggleFavoriteMutation } =
+      await import("./useToggleFavoriteMutation");
     const { result } = renderHook(() => useToggleFavoriteMutation(), {
       wrapper,
     });
@@ -77,9 +76,8 @@ describe("useToggleFavoriteMutation", () => {
 
   it("optimistically adds to favoriteTracks cache", async () => {
     qc.setQueryData<Track[]>(["favoriteTracks"], []);
-    const { useToggleFavoriteMutation } = await import(
-      "./useToggleFavoriteMutation"
-    );
+    const { useToggleFavoriteMutation } =
+      await import("./useToggleFavoriteMutation");
     const { result } = renderHook(() => useToggleFavoriteMutation(), {
       wrapper,
     });
@@ -93,9 +91,8 @@ describe("useToggleFavoriteMutation", () => {
   it("rolls back on error", async () => {
     setFavorite.mockRejectedValueOnce(new Error("network"));
     qc.setQueryData<Track[]>(["favoriteTracks"], []);
-    const { useToggleFavoriteMutation } = await import(
-      "./useToggleFavoriteMutation"
-    );
+    const { useToggleFavoriteMutation } =
+      await import("./useToggleFavoriteMutation");
     const { result } = renderHook(() => useToggleFavoriteMutation(), {
       wrapper,
     });
@@ -108,12 +105,9 @@ describe("useToggleFavoriteMutation", () => {
   });
 
   it("patches isFavorite in tracks cache", async () => {
-    qc.setQueryData<Track[]>(["tracks"], [
-      { ...baseTrack, isFavorite: false },
-    ]);
-    const { useToggleFavoriteMutation } = await import(
-      "./useToggleFavoriteMutation"
-    );
+    qc.setQueryData<Track[]>(["tracks"], [{ ...baseTrack, isFavorite: false }]);
+    const { useToggleFavoriteMutation } =
+      await import("./useToggleFavoriteMutation");
     const { result } = renderHook(() => useToggleFavoriteMutation(), {
       wrapper,
     });

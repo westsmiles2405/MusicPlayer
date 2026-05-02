@@ -113,7 +113,9 @@ describe("useKeyboardShortcuts", () => {
     document.body.appendChild(textarea);
     textarea.focus();
     renderHook(() => useKeyboardShortcuts(), { wrapper });
-    textarea.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    textarea.dispatchEvent(
+      new KeyboardEvent("keydown", { key: " ", bubbles: true }),
+    );
     expect(toggle).not.toHaveBeenCalled();
     textarea.remove();
   });

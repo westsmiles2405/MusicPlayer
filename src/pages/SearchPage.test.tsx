@@ -159,7 +159,10 @@ describe("SearchPage", () => {
     vi.useFakeTimers();
     let rejectSearch!: (reason: unknown) => void;
     search.mockImplementation(
-      () => new Promise((_resolve, reject) => { rejectSearch = reject; }),
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectSearch = reject;
+        }),
     );
     const { default: SearchPage } = await import("./SearchPage");
     render(<SearchPage />, { wrapper });
