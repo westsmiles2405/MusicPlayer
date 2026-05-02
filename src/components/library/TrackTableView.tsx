@@ -1,3 +1,9 @@
+import React, { useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+const isJsdom =
+  typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
+
 export interface TrackTableRow {
   id: number;
   title: string;
@@ -10,7 +16,102 @@ export interface TrackTableRow {
   isFavoritePending?: boolean;
 }
 
-export function TrackTableView({
+function TrackRow({
+  row,
+  index,
+  onPlay,
+  onRemove,
+  onToggleFavorite,
+  onReorderPlaylist,
+  rowsLength,
+  renderActions,
+}: {
+  row: TrackTableRow;
+  index: number;
+  onPlay: (row: TrackTableRow, index: number) => void;
+  onRemove?: (row: TrackTableRow) => void;
+  onToggleFavorite?: (row: TrackTableRow) => void;
+  onReorderPlaylist?: (
+    sourcePosition: number,
+    destinationPosition: number,
+  ) => void;
+  rowsLength: number;
+  renderActions?: (row: TrackTableRow) => React.ReactNode;
+}) {
+  return (
+    <tr
+      data-testid="track-row"
+      data-missing={row.missingAt !== null}
+    >
+      <td>{row.title}</td>
+      <td>{row.primaryArtistName ?? "未知艺人"}</td>
+      <td>{row.albumName ?? "未知专辑"}</td>
+      <td>{row.missingAt === null ? "" : "文件缺失"}</td>
+      <td>
+        {onToggleFavorite && row.isFavorite !== undefined && (
+          <button
+            type="button"
+            disabled={row.isFavoritePending}
+            onClick={() => onToggleFavorite(row)}
+            aria-label={row.isFavorite ? "取消收藏" : "收藏"}
+          >
+            {row.isFavoritePending
+              ? "..."
+              : row.isFavorite
+                ? "已喜欢"
+                : "喜欢"}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onPlay(row, index)}
+          disabled={row.missingAt !== null}
+          aria-label={`播放 ${row.title}`}
+        >
+          播放
+        </button>
+        {renderActions?.(row)}
+        {onReorderPlaylist && row.playlistPosition !== undefined && (
+          <>
+            <button
+              type="button"
+              disabled={row.playlistPosition <= 0}
+              onClick={() =>
+                onReorderPlaylist(
+                  row.playlistPosition!,
+                  row.playlistPosition! - 1,
+                )
+              }
+              aria-label="上移"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              disabled={row.playlistPosition >= rowsLength - 1}
+              onClick={() =>
+                onReorderPlaylist(
+                  row.playlistPosition!,
+                  row.playlistPosition! + 1,
+                )
+              }
+              aria-label="下移"
+            >
+              ↓
+            </button>
+          </>
+        )}
+        {onRemove && (
+          <button type="button" onClick={() => onRemove(row)}>
+            移除
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function VirtualizedTableBody({
   rows,
   queueContext,
   onPlay,
@@ -20,7 +121,7 @@ export function TrackTableView({
   renderActions,
 }: {
   rows: TrackTableRow[];
-  queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
+  queueContext: string;
   onPlay: (row: TrackTableRow, index: number) => void;
   onRemove?: (row: TrackTableRow) => void;
   onToggleFavorite?: (row: TrackTableRow) => void;
@@ -30,23 +131,51 @@ export function TrackTableView({
   ) => void;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
 }) {
+  const parentRef = useRef<HTMLTableSectionElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 40,
+    overscan: 5,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
   return (
-    <table className="track-table">
-      <thead>
-        <tr>
-          <th>标题</th>
-          <th>艺人</th>
-          <th>专辑</th>
-          <th>状态</th>
-          <th>操作</th>
+    <tbody
+      ref={parentRef}
+      style={{
+        display: "block",
+        overflow: "auto",
+        maxHeight: "100%",
+      }}
+    >
+      {virtualItems.length > 0 && (
+        <tr
+          style={{
+            display: "table",
+            tableLayout: "fixed",
+            width: "100%",
+            height: `${virtualItems[0]!.start}px`,
+          }}
+          aria-hidden="true"
+        >
+          <td colSpan={5} style={{ padding: 0, border: "none" }} />
         </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
+      )}
+      {virtualItems.map((virtualRow) => {
+        const row = rows[virtualRow.index]!;
+        return (
           <tr
             key={`${row.id}-${row.playlistPosition ?? queueContext}`}
             data-testid="track-row"
             data-missing={row.missingAt !== null}
+            style={{
+              display: "table",
+              tableLayout: "fixed",
+              width: "100%",
+            }}
           >
             <td>{row.title}</td>
             <td>{row.primaryArtistName ?? "未知艺人"}</td>
@@ -69,7 +198,7 @@ export function TrackTableView({
               )}
               <button
                 type="button"
-                onClick={() => onPlay(row, index)}
+                onClick={() => onPlay(row, virtualRow.index)}
                 disabled={row.missingAt !== null}
                 aria-label={`播放 ${row.title}`}
               >
@@ -113,6 +242,96 @@ export function TrackTableView({
               )}
             </td>
           </tr>
+        );
+      })}
+      {virtualItems.length > 0 && (
+        <tr
+          style={{
+            display: "table",
+            tableLayout: "fixed",
+            width: "100%",
+            height: `${virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end}px`,
+          }}
+          aria-hidden="true"
+        >
+          <td colSpan={5} style={{ padding: 0, border: "none" }} />
+        </tr>
+      )}
+    </tbody>
+  );
+}
+
+export function TrackTableView({
+  rows,
+  queueContext,
+  onPlay,
+  onRemove,
+  onToggleFavorite,
+  onReorderPlaylist,
+  renderActions,
+  virtual = true,
+}: {
+  rows: TrackTableRow[];
+  queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
+  onPlay: (row: TrackTableRow, index: number) => void;
+  onRemove?: (row: TrackTableRow) => void;
+  onToggleFavorite?: (row: TrackTableRow) => void;
+  onReorderPlaylist?: (
+    sourcePosition: number,
+    destinationPosition: number,
+  ) => void;
+  renderActions?: (row: TrackTableRow) => React.ReactNode;
+  virtual?: boolean;
+}) {
+  if (virtual && !isJsdom) {
+    return (
+      <table className="track-table">
+        <thead>
+          <tr>
+            <th>标题</th>
+            <th>艺人</th>
+            <th>专辑</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <VirtualizedTableBody
+          rows={rows}
+          queueContext={queueContext}
+          onPlay={onPlay}
+          onRemove={onRemove}
+          onToggleFavorite={onToggleFavorite}
+          onReorderPlaylist={onReorderPlaylist}
+          renderActions={renderActions}
+        />
+      </table>
+    );
+  }
+
+  return (
+    <table className="track-table">
+      <thead>
+        <tr>
+          <th>标题</th>
+          <th>艺人</th>
+          <th>专辑</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, index) => (
+          <TrackRow
+            key={`${row.id}-${row.playlistPosition ?? queueContext}`}
+            row={row}
+            index={index}
+            onPlay={onPlay}
+            onRemove={onRemove}
+            onToggleFavorite={onToggleFavorite}
+            onReorderPlaylist={onReorderPlaylist}
+            rowsLength={rows.length}
+            renderActions={renderActions}
+          />
         ))}
       </tbody>
     </table>

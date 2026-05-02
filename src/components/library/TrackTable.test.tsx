@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TrackTable } from "./TrackTable";
+import { TrackTableView } from "./TrackTableView";
 import type { Track } from "@/repositories/trackRepo";
+import type { TrackTableRow } from "./TrackTableView";
 
 const play = vi.fn();
 vi.mock("@/hooks/usePlayer", () => ({
@@ -47,7 +49,7 @@ describe("TrackTable", () => {
       { ...baseTrack, id: 2, title: "B", missingAt: 2 },
       { ...baseTrack, id: 3, title: "C" },
     ];
-    render(<TrackTable tracks={tracks} queueContext="songs" />);
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
     fireEvent.click(screen.getByRole("button", { name: "播放 C" }));
     expect(play).toHaveBeenCalledWith(3, [1, 3], 1);
   });
@@ -58,6 +60,7 @@ describe("TrackTable", () => {
       <TrackTable
         tracks={[{ ...baseTrack, missingAt: 2 }]}
         queueContext="playlist"
+        virtual={false}
       />,
     );
     expect(screen.getByRole("button", { name: "播放 A" })).toBeDisabled();
@@ -71,6 +74,7 @@ describe("TrackTable", () => {
         queueContext="songs"
         showFavorite
         onToggleFavorite={onToggleFavorite}
+        virtual={false}
       />,
     );
     expect(screen.getByRole("button", { name: "收藏" })).toBeInTheDocument();
@@ -84,6 +88,7 @@ describe("TrackTable", () => {
         queueContext="songs"
         showFavorite
         onToggleFavorite={onToggleFavorite}
+        virtual={false}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "收藏" }));
@@ -101,6 +106,7 @@ describe("TrackTable", () => {
         queueContext="songs"
         showFavorite
         onToggleFavorite={onToggleFavorite}
+        virtual={false}
       />,
     );
     expect(
@@ -109,7 +115,7 @@ describe("TrackTable", () => {
   });
 
   it("renders empty list without error", () => {
-    render(<TrackTable tracks={[]} queueContext="songs" />);
+    render(<TrackTable tracks={[]} queueContext="songs" virtual={false} />);
     expect(screen.queryAllByTestId("track-row")).toHaveLength(0);
   });
 
@@ -119,7 +125,49 @@ describe("TrackTable", () => {
       { ...baseTrack, id: 2, title: "B" },
       { ...baseTrack, id: 3, title: "C" },
     ];
-    render(<TrackTable tracks={tracks} queueContext="songs" />);
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
     expect(screen.getAllByTestId("track-row")).toHaveLength(3);
+  });
+
+  it("renders all rows in non-virtual mode", () => {
+    const rows: TrackTableRow[] = [
+      {
+        id: 1,
+        title: "X",
+        albumName: "Album",
+        primaryArtistName: "Artist",
+        durationMs: 1000,
+        missingAt: null,
+      },
+      {
+        id: 2,
+        title: "Y",
+        albumName: "Album",
+        primaryArtistName: "Artist",
+        durationMs: 2000,
+        missingAt: null,
+      },
+      {
+        id: 3,
+        title: "Z",
+        albumName: "Album",
+        primaryArtistName: "Artist",
+        durationMs: 3000,
+        missingAt: null,
+      },
+    ];
+    render(
+      <TrackTableView
+        rows={rows}
+        queueContext="songs"
+        onPlay={vi.fn()}
+        virtual={false}
+      />,
+    );
+    const renderedRows = screen.getAllByTestId("track-row");
+    expect(renderedRows).toHaveLength(3);
+    expect(renderedRows[0]).toHaveTextContent("X");
+    expect(renderedRows[1]).toHaveTextContent("Y");
+    expect(renderedRows[2]).toHaveTextContent("Z");
   });
 });

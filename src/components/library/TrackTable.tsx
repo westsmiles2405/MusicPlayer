@@ -17,6 +17,7 @@ interface TrackTableProps {
   ) => void;
   showFavorite?: boolean;
   onToggleFavorite?: (track: Track, favorite: boolean) => void;
+  virtual?: boolean;
 }
 
 export function TrackTable({
@@ -28,6 +29,7 @@ export function TrackTable({
   onReorderPlaylist,
   showFavorite,
   onToggleFavorite,
+  virtual,
 }: TrackTableProps) {
   const { play } = usePlayer();
   const [pendingFavoriteIds, setPendingFavoriteIds] = useState<Set<number>>(
@@ -137,6 +139,7 @@ export function TrackTable({
       onToggleFavorite={handleToggleFavorite}
       onReorderPlaylist={onReorderPlaylist}
       renderActions={renderActions}
+      virtual={virtual}
     />
   );
 }
