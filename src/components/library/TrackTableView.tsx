@@ -45,6 +45,7 @@ export function TrackTableView({
         {rows.map((row, index) => (
           <tr
             key={`${row.id}-${row.playlistPosition ?? queueContext}`}
+            data-testid="track-row"
             data-missing={row.missingAt !== null}
           >
             <td>{row.title}</td>
