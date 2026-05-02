@@ -2,13 +2,17 @@ import { useEffect, useRef } from "react";
 import { Outlet } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { MiniPlayer, NowPlayingOverlay } from "@/components/player";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useScanProgress } from "@/hooks/useScanProgress";
+import { useSystemTheme } from "@/hooks/useSystemTheme";
 import { useUIStore } from "@/stores/uiStore";
 import { ScanProgressBar } from "./ScanProgressBar";
 import { Sidebar } from "./Sidebar";
 import { invalidateAfterScan } from "./queryInvalidation";
 
 export function AppShell() {
+  useKeyboardShortcuts();
+  useSystemTheme();
   const { phase } = useScanProgress();
   const queryClient = useQueryClient();
   const lastPhase = useRef<typeof phase | null>(null);
