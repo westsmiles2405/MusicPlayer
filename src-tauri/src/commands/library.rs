@@ -68,7 +68,9 @@ pub async fn get_tracks(
         limit: default_limit(),
         offset: 0,
     });
-    db.with_conn(|c| tracks::list(c, p.sort, p.limit, p.offset))
+    let result = db.with_conn(|c| tracks::list(c, p.sort, p.limit, p.offset))?;
+    eprintln!("[get_tracks] returning {} tracks", result.len());
+    Ok(result)
 }
 
 #[tauri::command]

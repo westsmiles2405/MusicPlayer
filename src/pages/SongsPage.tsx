@@ -23,7 +23,11 @@ export default function SongsPage() {
 
   const tracks = useQuery({
     queryKey: ["tracks", sort],
-    queryFn: () => trackRepo.list({ sort }),
+    queryFn: async () => {
+      const result = await trackRepo.list({ sort });
+      console.log("[SongsPage] tracks result:", result.length, result);
+      return result;
+    },
   });
 
   const playlists = useQuery({
