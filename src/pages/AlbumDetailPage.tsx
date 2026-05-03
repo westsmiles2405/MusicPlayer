@@ -5,6 +5,7 @@ import { trackRepo } from "@/repositories/trackRepo";
 import { playlistRepo } from "@/repositories/playlistRepo";
 import { TrackTable } from "@/components/library/TrackTable";
 import { LoadingState, ErrorState } from "@/components/layout";
+import { CoverArt } from "@/components/library/CoverArt";
 import { usePlayer } from "@/hooks/usePlayer";
 
 export default function AlbumDetailPage() {
@@ -58,6 +59,11 @@ export default function AlbumDetailPage() {
       {album.data && (
         <>
           <div className="flex items-center gap-4 mb-4">
+            <CoverArt
+              coverPath={album.data.coverPath}
+              title={album.data.name}
+              size="lg"
+            />
             <div>
               <h1 className="text-2xl font-bold">{album.data.name}</h1>
               <p className="text-muted">{album.data.albumArtistName}</p>
