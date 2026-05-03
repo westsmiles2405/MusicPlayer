@@ -262,7 +262,7 @@ export function TrackTableView({
   onToggleFavorite,
   onReorderPlaylist,
   renderActions,
-  virtual = true,
+  virtual = false,
 }: {
   rows: TrackTableRow[];
   queueContext: "recent" | "songs" | "album" | "artist" | "playlist";

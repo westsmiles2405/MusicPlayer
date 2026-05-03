@@ -69,7 +69,6 @@ pub async fn get_tracks(
         offset: 0,
     });
     let result = db.with_conn(|c| tracks::list(c, p.sort, p.limit, p.offset))?;
-    eprintln!("[get_tracks] returning {} tracks", result.len());
     Ok(result)
 }
 
