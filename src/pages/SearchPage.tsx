@@ -3,10 +3,10 @@ import { Link } from "react-router";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   PageHeader,
-  EmptyState,
   LoadingState,
   ErrorState,
 } from "@/components/layout";
+import { DopamineEmptyState } from "@/components/ui";
 import { TrackTable } from "@/components/library/TrackTable";
 import { searchRepo } from "@/repositories/searchRepo";
 import { playlistRepo } from "@/repositories/playlistRepo";
@@ -63,9 +63,10 @@ export default function SearchPage() {
       </label>
 
       {trimmed.length === 0 && (
-        <EmptyState
-          title="开始搜索"
-          description="输入关键词以搜索歌曲、专辑、艺人或播放列表"
+        <DopamineEmptyState
+          context="search"
+          title="搜索音乐"
+          description="输入关键词来搜索歌曲、专辑或艺人"
         />
       )}
       {debouncedQuery.length > 0 && results.isLoading && (
@@ -74,7 +75,24 @@ export default function SearchPage() {
       {debouncedQuery.length > 0 && results.isError && (
         <ErrorState message={results.error?.message ?? "搜索失败"} />
       )}
-      {debouncedQuery.length > 0 && results.data && (
+      {debouncedQuery.length > 0 &&
+        results.data &&
+        results.data.tracks.length === 0 &&
+        results.data.albums.length === 0 &&
+        results.data.artists.length === 0 &&
+        results.data.playlists.length === 0 && (
+          <DopamineEmptyState
+            context="search"
+            title="没有找到结果"
+            description="试试其他关键词"
+          />
+        )}
+      {debouncedQuery.length > 0 &&
+        results.data &&
+        (results.data.tracks.length > 0 ||
+          results.data.albums.length > 0 ||
+          results.data.artists.length > 0 ||
+          results.data.playlists.length > 0) && (
         <div className="search-results">
           <section>
             <h2>歌曲</h2>
