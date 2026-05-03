@@ -35,11 +35,13 @@ export function usePlayerEvents() {
       ).catch(() => null),
     ]);
 
-    // Polling fallback: sync state every 500ms in case events are missed
+    // Polling fallback: sync state every 200ms in case events are missed
     const poll = setInterval(() => {
       if (!active) return;
-      playerRepo.getState().then(applySnapshot).catch(() => {});
-    }, 500);
+      playerRepo.getState().then((s) => {
+        if (active) applySnapshot(s);
+      }).catch(() => {});
+    }, 200);
 
     playerRepo
       .getState()

@@ -26,7 +26,7 @@ export function MiniPlayer() {
   const subtitle = [player.current?.artistName, player.current?.albumName]
     .filter(Boolean)
     .join(" - ");
-  const canControl = player.status !== "idle" && player.status !== "stopped";
+  const canControl = player.current !== null || (player.status !== "idle" && player.status !== "stopped");
   const progressMax = Math.max(player.durationMs, 1);
   const errorText = player.error?.message;
 
