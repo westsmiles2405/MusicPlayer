@@ -3,12 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { trackRepo, type TrackSort } from "@/repositories/trackRepo";
 import { playlistRepo } from "@/repositories/playlistRepo";
 import { TrackTable } from "@/components/library/TrackTable";
-import {
-  PageHeader,
-  EmptyState,
-  LoadingState,
-  ErrorState,
-} from "@/components/layout";
+import { PageHeader, LoadingState, ErrorState } from "@/components/layout";
+import { DopamineEmptyState } from "@/components/ui";
 
 const SORTS: { label: string; value: TrackSort }[] = [
   { label: "按标题", value: "title" },
@@ -76,7 +72,7 @@ export default function SongsPage() {
         <ErrorState message={tracks.error?.message ?? "加载失败"} />
       )}
       {tracks.data?.length === 0 && (
-        <EmptyState title="没有歌曲" description="扫描音乐文件夹以添加歌曲" />
+        <DopamineEmptyState context="library" title="还没有歌曲" description="扫描音乐文件夹以添加歌曲" />
       )}
       {tracks.data && tracks.data.length > 0 && (
         <TrackTable
