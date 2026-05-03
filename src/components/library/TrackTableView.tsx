@@ -41,7 +41,7 @@ function TrackRow({
   rowsLength: number;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
   currentTrackId?: number;
-  onPlayRow?: (row: TrackTableRow) => void;
+  onPlayRow?: (row: TrackTableRow, index: number) => void;
 }) {
   const isPlaying = currentTrackId === row.id;
   return (
@@ -50,7 +50,7 @@ function TrackRow({
       data-missing={row.missingAt !== null}
       className={`track-table__row${isPlaying ? ' track-table__row--playing' : ''}`}
       aria-current={isPlaying ? 'true' : undefined}
-      onDoubleClick={() => onPlayRow?.(row)}
+      onDoubleClick={() => onPlayRow?.(row, index)}
     >
       <td className="track-table__number-cell">
         <span className="track-table__number">
@@ -62,7 +62,7 @@ function TrackRow({
           </span>
         </span>
       </td>
-      <td>{row.title}</td>
+      <td className="track-table__title">{row.title}</td>
       <td>{row.primaryArtistName ?? "未知艺人"}</td>
       <td>{row.albumName ?? "未知专辑"}</td>
       <td>{row.missingAt === null ? "" : "文件缺失"}</td>
@@ -148,7 +148,7 @@ function VirtualizedTableBody({
   ) => void;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
   currentTrackId?: number;
-  onPlayRow?: (row: TrackTableRow) => void;
+  onPlayRow?: (row: TrackTableRow, index: number) => void;
 }) {
   const parentRef = useRef<HTMLTableSectionElement>(null);
 
@@ -193,7 +193,7 @@ function VirtualizedTableBody({
             data-missing={row.missingAt !== null}
             className={`track-table__row${isPlaying ? ' track-table__row--playing' : ''}`}
             aria-current={isPlaying ? 'true' : undefined}
-            onDoubleClick={() => onPlayRow?.(row)}
+            onDoubleClick={() => onPlayRow?.(row, virtualRow.index)}
             style={{
               display: "table",
               tableLayout: "fixed",
@@ -210,7 +210,7 @@ function VirtualizedTableBody({
                 </span>
               </span>
             </td>
-            <td>{row.title}</td>
+            <td className="track-table__title">{row.title}</td>
             <td>{row.primaryArtistName ?? "未知艺人"}</td>
             <td>{row.albumName ?? "未知专辑"}</td>
             <td>{row.missingAt === null ? "" : "文件缺失"}</td>
@@ -318,7 +318,7 @@ export function TrackTableView({
   renderActions?: (row: TrackTableRow) => React.ReactNode;
   virtual?: boolean;
   currentTrackId?: number;
-  onPlayRow?: (row: TrackTableRow) => void;
+  onPlayRow?: (row: TrackTableRow, index: number) => void;
 }) {
   if (virtual && !isJsdom) {
     return (

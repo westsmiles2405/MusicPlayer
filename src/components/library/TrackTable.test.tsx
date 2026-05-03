@@ -151,6 +151,21 @@ describe("TrackTable", () => {
     usePlayerStore.setState({ current: null });
   });
 
+  it("applies --playing class to the currently playing row", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore");
+    usePlayerStore.setState({ current: { id: 2, title: "B", albumName: null, artistName: null, durationMs: 1000, coverPath: null } });
+    const tracks = [
+      baseTrack,
+      { ...baseTrack, id: 2, title: "B" },
+    ];
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
+    const rows = screen.getAllByTestId("track-row");
+    expect(rows[0]).not.toHaveClass("track-table__row--playing");
+    expect(rows[1]).toHaveClass("track-table__row--playing");
+    // cleanup
+    usePlayerStore.setState({ current: null });
+  });
+
   it("renders number cells with text and icon elements", () => {
     const tracks = [baseTrack];
     render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);

@@ -144,12 +144,7 @@ export function TrackTable({
       renderActions={renderActions}
       virtual={virtual}
       currentTrackId={currentTrackId}
-      onPlayRow={(row) => {
-        const visibleIndex = rows.findIndex((item) => item.id === row.id);
-        if (visibleIndex >= 0) {
-          handlePlay(row, visibleIndex);
-        }
-      }}
+      onPlayRow={handlePlay}
     />
   );
 }
