@@ -66,8 +66,9 @@ export function TrackTable({
     seen.set(t.id, nth + 1);
   }
 
-  const handlePlay = (row: TrackTableRow, _rowIndex: number) => {
-    play(row.id);
+  const handlePlay = (row: TrackTableRow, rowIndex: number) => {
+    const queueIndex = queueIndexByRow[rowIndex] ?? -1;
+    play(row.id, playableIds, queueIndex >= 0 ? queueIndex : undefined);
   };
 
   const handleToggleFavorite = onToggleFavorite
