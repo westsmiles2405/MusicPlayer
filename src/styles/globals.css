@@ -258,6 +258,32 @@ body,
   margin: 0;
 }
 
+.nav-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.nav-bar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.nav-bar__btn:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .state {
   display: flex;
   flex-direction: column;

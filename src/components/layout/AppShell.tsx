@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Outlet } from "react-router";
+import { Outlet, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MiniPlayer, NowPlayingOverlay } from "@/components/player";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useScanProgress } from "@/hooks/useScanProgress";
@@ -19,6 +20,7 @@ export function AppShell() {
   const isNowPlayingOpen = useUIStore((s) => s.isNowPlayingOpen);
   const closeNowPlaying = useUIStore((s) => s.closeNowPlaying);
   const shellRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (phase === "done" && lastPhase.current !== "done") {
@@ -53,6 +55,24 @@ export function AppShell() {
     <div className="app-shell" ref={shellRef}>
       <Sidebar />
       <main className="app-shell__main">
+        <div className="nav-bar">
+          <button
+            type="button"
+            className="nav-bar__btn"
+            onClick={() => navigate(-1)}
+            aria-label="后退"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            className="nav-bar__btn"
+            onClick={() => navigate(1)}
+            aria-label="前进"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
         <Outlet />
       </main>
       <MiniPlayer />
