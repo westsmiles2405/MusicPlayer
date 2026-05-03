@@ -140,7 +140,7 @@ describe("SearchPage", () => {
   it("shows empty state when query is empty", async () => {
     const { default: SearchPage } = await import("./SearchPage");
     render(<SearchPage />, { wrapper });
-    expect(await screen.findByText("开始搜索")).toBeInTheDocument();
+    expect(await screen.findByText("搜索音乐")).toBeInTheDocument();
   });
 
   it("shows loading state while searching", async () => {

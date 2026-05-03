@@ -54,7 +54,7 @@ describe("FavoritesPage", () => {
     await act(async () => {
       render(<FavoritesPage />, { wrapper });
     });
-    expect(await screen.findByText("还没有喜欢的歌曲")).toBeInTheDocument();
+    expect(await screen.findByText("还没有收藏")).toBeInTheDocument();
   });
 
   it("renders favorite tracks list", async () => {
