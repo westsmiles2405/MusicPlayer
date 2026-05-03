@@ -12,6 +12,15 @@ use crate::db::{
 use crate::error::{AppError, AppResult};
 use crate::library::scanner::{self, AbortFlag, ScanProgress, ScanReport};
 
+fn resolve_cover_path(covers_dir: &std::path::Path, cover_path: &mut Option<String>) {
+    if let Some(ref p) = cover_path {
+        let abs = covers_dir.join(p);
+        if abs.exists() {
+            *cover_path = Some(abs.to_string_lossy().into_owned());
+        }
+    }
+}
+
 // ---- query params ----
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,8 +82,16 @@ pub async fn get_tracks(
 }
 
 #[tauri::command]
-pub async fn get_albums(db: State<'_, Database>) -> AppResult<Vec<albums::AlbumView>> {
-    db.with_conn(albums::get_all)
+pub async fn get_albums(app: AppHandle, db: State<'_, Database>) -> AppResult<Vec<albums::AlbumView>> {
+    let covers_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Scan(format!("app_data_dir: {e}")))?;
+    let mut result = db.with_conn(albums::get_all)?;
+    for a in &mut result {
+        resolve_cover_path(&covers_dir, &mut a.album.cover_path);
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -84,10 +101,19 @@ pub async fn get_artists(db: State<'_, Database>) -> AppResult<Vec<artists::Arti
 
 #[tauri::command]
 pub async fn get_album(
+    app: AppHandle,
     db: State<'_, Database>,
     album_id: i64,
 ) -> AppResult<Option<albums::AlbumView>> {
-    db.with_conn(|c| albums::get_by_id(c, album_id))
+    let covers_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Scan(format!("app_data_dir: {e}")))?;
+    let mut result = db.with_conn(|c| albums::get_by_id(c, album_id))?;
+    if let Some(ref mut a) = result {
+        resolve_cover_path(&covers_dir, &mut a.album.cover_path);
+    }
+    Ok(result)
 }
 
 #[tauri::command]
