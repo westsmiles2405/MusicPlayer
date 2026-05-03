@@ -7,8 +7,8 @@ import {
   PageHeader,
   LoadingState,
   ErrorState,
-  EmptyState,
 } from "@/components/layout";
+import { DopamineEmptyState } from "@/components/ui";
 import {
   PlaylistRenameDialog,
   PlaylistDeleteDialog,
@@ -135,9 +135,10 @@ export default function PlaylistDetailPage() {
             <ErrorState message={tracks.error?.message ?? "加载失败"} />
           )}
           {tracks.data?.length === 0 && (
-            <EmptyState
+            <DopamineEmptyState
+              context="playlists"
               title="播放列表为空"
-              description="从歌曲页面添加音乐到此播放列表"
+              description="添加一些歌曲到这个播放列表"
             />
           )}
           {tracks.data && tracks.data.length > 0 && (
