@@ -22,28 +22,37 @@ export function usePlayerEvents() {
     const unlisteners = Promise.all([
       listen<PlayerSnapshot>("playback_state", (event) =>
         applySnapshot(event.payload),
-      ),
+      ).catch(() => null),
       listen<PlaybackProgress>("playback_progress", (event) =>
         applyProgress(event.payload),
-      ),
+      ).catch(() => null),
       listen<NowPlayingTrack | null>("track_changed", (event) => {
         applyTrackChanged(event.payload);
-        // Rust 侧在 track 切换时已写入 play_history，刷新最近播放列表
         queryClient.invalidateQueries({ queryKey: ["recentPlays"] });
-      }),
+      }).catch(() => null),
       listen<PlaybackError>("playback_error", (event) =>
         applyError(event.payload),
-      ),
+      ).catch(() => null),
     ]);
 
-    playerRepo.getState().then((snapshot) => {
-      if (active) applySnapshot(snapshot);
-    });
+    // Polling fallback: sync state every 500ms in case events are missed
+    const poll = setInterval(() => {
+      if (!active) return;
+      playerRepo.getState().then(applySnapshot).catch(() => {});
+    }, 500);
+
+    playerRepo
+      .getState()
+      .then((snapshot) => {
+        if (active) applySnapshot(snapshot);
+      })
+      .catch(() => {});
 
     return () => {
       active = false;
+      clearInterval(poll);
       unlisteners.then((callbacks) =>
-        callbacks.forEach((unlisten) => unlisten()),
+        callbacks.forEach((unlisten) => unlisten?.()),
       );
     };
   }, [applyError, applyProgress, applySnapshot, applyTrackChanged]);
