@@ -6,6 +6,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { useMemo } from "react";
 import { usePlayer } from "@/hooks/usePlayer";
 import { useUIStore } from "@/stores/uiStore";
@@ -48,7 +49,12 @@ export function MiniPlayer() {
           if (e.key === "Enter") openNowPlaying();
         }}
       >
-        <div className="mini-player__art" aria-hidden="true" />
+        <motion.div
+          className="mini-player__art"
+          aria-hidden="true"
+          layoutId="now-playing-cover"
+          style={{ borderRadius: 8 }}
+        />
         <div className="mini-player__meta">
           <div className="mini-player__title">{title}</div>
           <div className="mini-player__subtitle">{errorText ?? subtitle}</div>

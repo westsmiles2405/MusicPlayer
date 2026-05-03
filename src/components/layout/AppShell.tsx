@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { LayoutGroup } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MiniPlayer, NowPlayingOverlay } from "@/components/player";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -75,9 +76,11 @@ export function AppShell() {
         </div>
         <Outlet />
       </main>
-      <MiniPlayer />
-      <ScanProgressBar />
-      <NowPlayingOverlay open={isNowPlayingOpen} onClose={closeNowPlaying} />
+      <LayoutGroup id="now-playing">
+        <MiniPlayer />
+        <ScanProgressBar />
+        <NowPlayingOverlay open={isNowPlayingOpen} onClose={closeNowPlaying} />
+      </LayoutGroup>
     </div>
   );
 }

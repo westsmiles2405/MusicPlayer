@@ -39,10 +39,10 @@ export function NowPlayingOverlay({
           className="now-playing"
           role="dialog"
           aria-label="Now Playing"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 40 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
         >
           <div className="np-bg">
             <div className="np-bg__gradient" />
@@ -67,16 +67,17 @@ export function NowPlayingOverlay({
 
           {current ? (
             <div className="now-playing__body">
-              <div
+              <motion.div
                 className="now-playing__cover"
                 data-testid="now-playing-cover"
+                layoutId="now-playing-cover"
               >
                 {current.coverPath ? (
                   <img src={current.coverPath} alt="" />
                 ) : (
                   <div className="now-playing__cover-placeholder" />
                 )}
-              </div>
+              </motion.div>
 
               <div className="now-playing__info">
                 <div className="now-playing__title">{current.title}</div>
