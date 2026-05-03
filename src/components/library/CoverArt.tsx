@@ -1,3 +1,5 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
+
 const gradients = [
   "linear-gradient(135deg, #f04d5f, #235a7a)",
   "linear-gradient(135deg, #d85a2a, #2d7c6f)",
@@ -22,10 +24,13 @@ export function CoverArt({
   size?: "sm" | "md" | "lg";
 }) {
   if (coverPath) {
+    const src = coverPath.startsWith("/") || coverPath.startsWith("http")
+      ? convertFileSrc(coverPath)
+      : coverPath;
     return (
       <img
         className={`cover-art cover-art--${size}`}
-        src={coverPath}
+        src={src}
         alt={title}
       />
     );
