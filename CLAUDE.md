@@ -8,7 +8,7 @@
 
 - **目标平台**：macOS（首发，Mac App Store）+ Web（GitHub Pages）；Windows 推迟到 v1.x。
 - **项目性质**：个人作品集 → 演进为公开发布产品（GitHub 公开，MIT License）。
-- **当前版本**：v0.5.0（资料库浏览 + 播放列表已交付）→ v0.6.0（全局搜索 + 收藏 + 最近播放）。
+- **当前版本**：v0.8.0（UI 升级 + 收藏 + 封面 + 播放修复）。
 - **当前阶段**：Phase 1 / v1.0 — **本地音乐播放器**（无后端、无 DRM）。
 - **完整设计**：见 `docs/superpowers/specs/2026-04-30-apple-music-style-player-design.md`。
 - **背景调研**：`Apple Music 风格音乐播放器分析报告.pdf`（项目根，14 页）。
@@ -64,14 +64,16 @@
 ```
 MusicPlayer/
 ├── src/                        # React 前端
-│   ├── pages/                  # LibraryPage / SettingsPage（路由 App.tsx）
+│   ├── pages/                  # 各页面组件（路由 App.tsx）
 │   ├── components/{layout,player,library,ui,effects}/
-│   │   └── layout/ScanProgressBar.tsx   # 全局扫描进度条
+│   │   ├── layout/ScanProgressBar.tsx   # 全局扫描进度条
+│   │   └── ui/DopamineEmptyState.tsx    # 多巴胺风格空状态组件
 │   ├── stores/                 # Zustand: playerStore / uiStore / prefsStore
-│   ├── hooks/                  # usePlayer (playback_state/track_changed/progress/error 事件) / useScanProgress
+│   ├── hooks/                  # usePlayer (200ms 轮询 + 事件监听) / useScanProgress
 │   ├── repositories/           # ⚠️ 关键解耦层（Phase 2 切 HTTP 时只改这里）
 │   │   └── playerRepo.ts      # player_* Tauri invoke 封装
-│   ├── lib/  i18n/  styles/
+│   ├── lib/tauri.ts            # Tauri invoke/listen 包装（isTauri 运行时检查）
+│   ├── i18n/  styles/
 │
 ├── src-tauri/                  # Rust 核心
 │   ├── tauri.conf.json
@@ -113,6 +115,10 @@ MusicPlayer/
 13. **Buffer 背压模型**。`push_samples()` 返回实际写入的样本数；position 仅按已写入样本推进。ringbuf 满时未写入的 chunk 尾部存入 `pending_samples`，下个 tick 优先写入。`flush_pending()` 后若仍有残留 → 跳过 decoder 本 tick。
 14. **Gapless 只在失效路径 cancel**。`finish_session(Stop/Replaced/DecodeError/OutputError/Shutdown)` 取消预解码；`Completed/Next/Previous` 保留结果，供 `advance_next()` 队列推进后消费。
 15. **播放列表允许重复 track ID**。`playlist_tracks` 表支持同一 `track_id` 多次出现。前端计算 queue index 时不能用 `indexOf(id)`（总是返回第一次出现），必须按行在数组中的实际位置做 occurrence-aware 映射。
+16. **Tauri invoke/listen 必须通过 `@/lib/tauri` 包装**。直接从 `@tauri-apps/api/core` 导入会在 Tauri 运行时未就绪时崩溃。包装器通过 `isTauri()` 检查 `window.__TAURI_INTERNALS__`，未就绪时 reject/resolve 空操作。
+17. **本地文件加载需 `convertFileSrc` + `protocol-asset`**。Tauri webview 不能直接用 `<img src="/absolute/path">` 加载本地文件。CoverArt 组件用 `convertFileSrc()` 将绝对路径转为 `asset://` URL；Rust 端 `get_albums`/`get_album` 将相对路径 `covers/hash.jpg` 解析为绝对路径。需要 Cargo.toml 启用 `protocol-asset` feature + tauri.conf.json 配置 `assetProtocol.scope`。
+18. **暂停必须清空音频缓冲区**。`engine.pause()` 除设置状态外还需调用 `audio.clear()` + `pending_samples.clear()`，否则 cpal 回调继续输出缓冲区样本导致数秒延迟。
+19. **usePlayer 使用 200ms 轮询兜底**。Tauri 事件监听可能在运行时未就绪时注册失败，`usePlayerEvents` 除事件监听外还每 200ms 调用 `playerRepo.getState()` 同步状态，确保 MiniPlayer 控件（暂停/播放切换）正常工作。
 
 ## 6. 工程规范
 
@@ -132,21 +138,24 @@ MusicPlayer/
 
 1. ~~本地音乐扫描~~ ✅ v0.3.0（mp3/m4a/flac/wav/aac，递归 + lofty 标签 + xxh3 hash + 封面缓存）
 2. ~~资料库浏览~~ ✅ v0.5.0（侧边栏：最近添加 / 歌曲 / 专辑 / 艺人，React Query + TrackTable）
-3. ~~专辑 / 艺人详情页~~ ✅ v0.5.0（详情页含播放按钮，加入播放列表菜单）
+3. ~~专辑 / 艺人详情页~~ ✅ v0.5.0（详情页含播放按钮 + 封面，加入播放列表菜单）
 4. ~~用户播放列表~~ ✅ v0.5.0（CRUD 对话框 + 拖拽排序 + 缺失曲目处理）
-5. ~~播放控制~~ ✅ v0.4.0（播放/暂停/上下首/进度/音量，ringbuf 背压 + pending buffer）
+5. ~~播放控制~~ ✅ v0.4.0（播放/暂停/上下首/进度/音量，ringbuf 背压 + pending buffer，暂停即时清空缓冲区）
 6. ~~播放队列~~ ✅ v0.4.0（确定性顺序/随机/循环/单曲循环，PlayQueue）
 7. ~~底部 Mini Player~~ ✅ v0.4.0（传输控件/进度条/音量/错误显示）
 8. 全局搜索（FTS5）
-9. 最近播放 + 收藏
+9. ~~最近播放 + 收藏~~ ✅ v0.8.0（所有列表页含收藏按钮，最近播放/最近添加页面）
 10. ~~macOS Now Playing 系统集成~~ ✅ v0.4.0（MPNowPlayingInfoCenter + MPRemoteCommandCenter，媒体键/控制中心）
 11. 毛玻璃 UI（系统材质 NSVisualEffectView，Web 端用 backdrop-filter 兜底）
 12. ~~**Gapless 无缝播放**~~ ✅ v0.4.0（后台预解码下一首首个 chunk，<1s 剩余时触发）
 13. **键盘快捷键**（空格 / ⌘F / 媒体键）
 14. **i18n 框架**（zh 优先）
 15. **主题跟随系统**（不做手动切换）
+16. ~~多巴胺风格空状态~~ ✅ v0.8.0（DopamineEmptyState 组件，渐变背景 + 浮动图标 + 微动画）
+17. ~~导航按钮~~ ✅ v0.8.0（Apple Music 风格 < > 前进后退）
+18. ~~封面显示~~ ✅ v0.8.0（convertFileSrc + protocol-asset，相对路径→绝对路径解析）
 
-**不做（推迟到 v1.1+）**：均衡器、智能播放列表、iTunes XML 导入、音频可视化、外部歌词抓取、桌面歌词浮窗。
+**不做（推迟到 v1.1+）**：均衡器、智能播放列表、iTunes XML 导入、音频可视化、外部歌词抓取、桌面歌词浮窗、用户自定义封面上传。
 
 ## 8. 常用开发命令（项目搭好后填充）
 
@@ -185,6 +194,7 @@ CARGO_TARGET_DIR=/tmp/musicplayer-target cargo check --manifest-path src-tauri/C
 - **macOS Now Playing 集成**：✅ 已通过 objc2 0.6 + objc2-media-player 0.3 + block2 0.6 实现。注意：`msg_send!` 参数间需要逗号（objc2 0.6 语法），`NSMutableDictionary::insert` 的 `CopyingHelper` 约束对 `&NSString` 不满足（用 `msg_send!` 绕开），`RcBlock` 不是 `Send`（丢弃 `addTargetWithHandler` 返回值即可，MPRemoteCommandCenter 内部 retain）。
 - **FLAC / ALAC 兼容性**：symphonia 对部分变体支持有限，必要时 fallback 到 ffmpeg-rs（Phase 1.x）。
 - **Web 端音频**：用 Web Audio API 兜底，体验弱化（无 Gapless / 无低延迟）。
+- **Tauri asset protocol**：本地文件加载（封面等）需在 Cargo.toml 启用 `protocol-asset` feature 并在 tauri.conf.json 配置 `assetProtocol.scope`，否则 `convertFileSrc` 返回的 URL 会被 webview 拒绝。
 - **Vitest `act()` 警告**：当组件（如 MiniPlayer）通过事件监听触发异步状态更新时，测试中 `render()` 需包裹在 `await act(async () => {...})` 内，且 `invoke` mock 需按命令名返回不同数据（不能用单一 `mockResolvedValue`），否则 React Query flush 时会拿到错误的返回值类型。
 - **对话框状态重置**：用 `useState(initialProp)` 初始化的受控组件，在父组件保持挂载的情况下关闭再打开不会重置状态。必须加 `useEffect` 同步 `open` 和 `initialProp` 变化。
 
@@ -205,6 +215,7 @@ CARGO_TARGET_DIR=/tmp/musicplayer-target cargo check --manifest-path src-tauri/C
 - v0.3.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.3.0-library-scanner.md`
 - v0.4.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.4.0-audio-engine.md`
 - v0.5.0 实施计划：`docs/superpowers/plans/2026-05-01-v0.5.0-library-playlists.md`
+- DopamineEmptyState 设计：`docs/superpowers/specs/2026-05-03-dopamine-empty-state-design.md`
 - 调研报告：`Apple Music 风格音乐播放器分析报告.pdf`
 - Tauri 2 文档：https://tauri.app/start/
 - React 19：https://react.dev/
