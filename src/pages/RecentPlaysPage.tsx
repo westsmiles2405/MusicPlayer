@@ -6,10 +6,10 @@ import { playlistRepo } from "@/repositories/playlistRepo";
 import { TrackTable } from "@/components/library/TrackTable";
 import {
   PageHeader,
-  EmptyState,
   LoadingState,
   ErrorState,
 } from "@/components/layout";
+import { DopamineEmptyState } from "@/components/ui";
 
 export default function RecentPlaysPage() {
   const queryClient = useQueryClient();
@@ -56,9 +56,10 @@ export default function RecentPlaysPage() {
         <ErrorState message={recentPlays.error?.message ?? "加载失败"} />
       )}
       {recentPlays.data?.length === 0 && (
-        <EmptyState
-          title="还没有最近播放记录"
-          description="播放任意歌曲后，这里会出现记录"
+        <DopamineEmptyState
+          context="recent"
+          title="最近播放为空"
+          description="播放过的歌曲会出现在这里"
         />
       )}
       {recentPlays.data && recentPlays.data.length > 0 && (

@@ -4,10 +4,10 @@ import { playlistRepo } from "@/repositories/playlistRepo";
 import { TrackTable } from "@/components/library/TrackTable";
 import {
   PageHeader,
-  EmptyState,
   LoadingState,
   ErrorState,
 } from "@/components/layout";
+import { DopamineEmptyState } from "@/components/ui";
 import { useToggleFavoriteMutation } from "@/hooks/useToggleFavoriteMutation";
 
 export default function FavoritesPage() {
@@ -48,9 +48,10 @@ export default function FavoritesPage() {
         <ErrorState message={favorites.error?.message ?? "加载失败"} />
       )}
       {favorites.data?.length === 0 && (
-        <EmptyState
-          title="还没有喜欢的歌曲"
-          description="在歌曲、专辑、艺人详情或搜索结果中标记喜欢"
+        <DopamineEmptyState
+          context="favorites"
+          title="还没有收藏"
+          description="点击心形图标收藏你喜欢的歌曲"
         />
       )}
       {favorites.data && favorites.data.length > 0 && (

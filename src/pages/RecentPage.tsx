@@ -3,10 +3,10 @@ import { trackRepo } from "@/repositories/trackRepo";
 import { TrackTable } from "@/components/library/TrackTable";
 import {
   PageHeader,
-  EmptyState,
   LoadingState,
   ErrorState,
 } from "@/components/layout";
+import { DopamineEmptyState } from "@/components/ui";
 
 export default function RecentPage() {
   const tracks = useQuery({
@@ -22,9 +22,10 @@ export default function RecentPage() {
         <ErrorState message={tracks.error?.message ?? "加载失败"} />
       )}
       {tracks.data?.length === 0 && (
-        <EmptyState
-          title="没有最近添加的歌曲"
-          description="扫描音乐文件夹以开始"
+        <DopamineEmptyState
+          context="recent"
+          title="最近添加为空"
+          description="新添加的音乐会出现在这里"
         />
       )}
       {tracks.data && tracks.data.length > 0 && (
