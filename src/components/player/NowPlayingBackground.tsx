@@ -1,18 +1,22 @@
-export function NowPlayingBackground({
-  coverPath,
-}: {
-  coverPath: string | null;
-}) {
+import { useDynamicColors } from '@/hooks/useDynamicColors';
+
+interface Props {
+  coverUrl: string | null;
+}
+
+export function NowPlayingBackground({ coverUrl }: Props) {
+  const colors = useDynamicColors(coverUrl);
+
   return (
-    <div className="np-bg">
-      <div className="np-bg__gradient" />
-      {coverPath && (
-        <div
-          className="np-bg__blurred-cover"
-          style={{ backgroundImage: `url(${coverPath})` }}
-        />
-      )}
-      <div className="np-bg__glass" />
-    </div>
+    <div
+      className="np-bg"
+      style={{
+        background: `
+          radial-gradient(ellipse at 50% 0%, ${colors.primary}40 0%, transparent 70%),
+          linear-gradient(180deg, ${colors.background} 0%, #000 100%)
+        `,
+        transition: 'background 0.5s ease',
+      }}
+    />
   );
 }
