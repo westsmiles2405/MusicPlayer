@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { listen } from "@tauri-apps/api/event";
+import { listen } from "@/lib/tauri";
 import {
   playerRepo,
   type NowPlayingTrack,
