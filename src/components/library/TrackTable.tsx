@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { usePlayer } from "@/hooks/usePlayer";
+import { usePlayerStore } from "@/stores/playerStore";
 import type { Track } from "@/repositories/trackRepo";
 import type { Playlist, PlaylistTrack } from "@/repositories/playlistRepo";
 import { TrackTableView } from "./TrackTableView";
@@ -32,6 +33,7 @@ export function TrackTable({
   virtual,
 }: TrackTableProps) {
   const { play } = usePlayer();
+  const currentTrackId = usePlayerStore((s) => s.current?.id);
   const [pendingFavoriteIds, setPendingFavoriteIds] = useState<Set<number>>(
     () => new Set(),
   );
@@ -100,6 +102,7 @@ export function TrackTable({
       durationMs: t.durationMs,
       missingAt: t.missingAt,
       playlistPosition,
+      trackNo: t.trackNo ?? undefined,
       isFavorite: showFavorite ? t.isFavorite : undefined,
       isFavoritePending: pendingFavoriteIds.has(t.id),
     };
@@ -140,6 +143,13 @@ export function TrackTable({
       onReorderPlaylist={onReorderPlaylist}
       renderActions={renderActions}
       virtual={virtual}
+      currentTrackId={currentTrackId}
+      onPlayRow={(row) => {
+        const visibleIndex = rows.findIndex((item) => item.id === row.id);
+        if (visibleIndex >= 0) {
+          handlePlay(row, visibleIndex);
+        }
+      }}
     />
   );
 }

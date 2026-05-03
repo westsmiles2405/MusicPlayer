@@ -12,6 +12,7 @@ export interface TrackTableRow {
   durationMs: number;
   missingAt: number | null;
   playlistPosition?: number;
+  trackNo?: number;
   isFavorite?: boolean;
   isFavoritePending?: boolean;
 }
@@ -25,6 +26,8 @@ function TrackRow({
   onReorderPlaylist,
   rowsLength,
   renderActions,
+  currentTrackId,
+  onPlayRow,
 }: {
   row: TrackTableRow;
   index: number;
@@ -37,9 +40,28 @@ function TrackRow({
   ) => void;
   rowsLength: number;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
+  currentTrackId?: number;
+  onPlayRow?: (row: TrackTableRow) => void;
 }) {
+  const isPlaying = currentTrackId === row.id;
   return (
-    <tr data-testid="track-row" data-missing={row.missingAt !== null}>
+    <tr
+      data-testid="track-row"
+      data-missing={row.missingAt !== null}
+      className={`track-table__row${isPlaying ? ' track-table__row--playing' : ''}`}
+      aria-current={isPlaying ? 'true' : undefined}
+      onDoubleClick={() => onPlayRow?.(row)}
+    >
+      <td className="track-table__number-cell">
+        <span className="track-table__number">
+          <span className="track-table__number-text">
+            {row.trackNo || index + 1}
+          </span>
+          <span className="track-table__number-icon" aria-hidden="true">
+            ▶
+          </span>
+        </span>
+      </td>
       <td>{row.title}</td>
       <td>{row.primaryArtistName ?? "未知艺人"}</td>
       <td>{row.albumName ?? "未知专辑"}</td>
@@ -112,6 +134,8 @@ function VirtualizedTableBody({
   onToggleFavorite,
   onReorderPlaylist,
   renderActions,
+  currentTrackId,
+  onPlayRow,
 }: {
   rows: TrackTableRow[];
   queueContext: string;
@@ -123,6 +147,8 @@ function VirtualizedTableBody({
     destinationPosition: number,
   ) => void;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
+  currentTrackId?: number;
+  onPlayRow?: (row: TrackTableRow) => void;
 }) {
   const parentRef = useRef<HTMLTableSectionElement>(null);
 
@@ -154,22 +180,36 @@ function VirtualizedTableBody({
           }}
           aria-hidden="true"
         >
-          <td colSpan={5} style={{ padding: 0, border: "none" }} />
+          <td colSpan={6} style={{ padding: 0, border: "none" }} />
         </tr>
       )}
       {virtualItems.map((virtualRow) => {
         const row = rows[virtualRow.index]!;
+        const isPlaying = currentTrackId === row.id;
         return (
           <tr
             key={`${row.id}-${row.playlistPosition ?? queueContext}`}
             data-testid="track-row"
             data-missing={row.missingAt !== null}
+            className={`track-table__row${isPlaying ? ' track-table__row--playing' : ''}`}
+            aria-current={isPlaying ? 'true' : undefined}
+            onDoubleClick={() => onPlayRow?.(row)}
             style={{
               display: "table",
               tableLayout: "fixed",
               width: "100%",
             }}
           >
+            <td className="track-table__number-cell">
+              <span className="track-table__number">
+                <span className="track-table__number-text">
+                  {row.trackNo || virtualRow.index + 1}
+                </span>
+                <span className="track-table__number-icon" aria-hidden="true">
+                  ▶
+                </span>
+              </span>
+            </td>
             <td>{row.title}</td>
             <td>{row.primaryArtistName ?? "未知艺人"}</td>
             <td>{row.albumName ?? "未知专辑"}</td>
@@ -247,7 +287,7 @@ function VirtualizedTableBody({
           }}
           aria-hidden="true"
         >
-          <td colSpan={5} style={{ padding: 0, border: "none" }} />
+          <td colSpan={6} style={{ padding: 0, border: "none" }} />
         </tr>
       )}
     </tbody>
@@ -263,6 +303,8 @@ export function TrackTableView({
   onReorderPlaylist,
   renderActions,
   virtual = false,
+  currentTrackId,
+  onPlayRow,
 }: {
   rows: TrackTableRow[];
   queueContext: "recent" | "songs" | "album" | "artist" | "playlist";
@@ -275,12 +317,15 @@ export function TrackTableView({
   ) => void;
   renderActions?: (row: TrackTableRow) => React.ReactNode;
   virtual?: boolean;
+  currentTrackId?: number;
+  onPlayRow?: (row: TrackTableRow) => void;
 }) {
   if (virtual && !isJsdom) {
     return (
       <table className="track-table">
         <thead>
           <tr>
+            <th>#</th>
             <th>标题</th>
             <th>艺人</th>
             <th>专辑</th>
@@ -296,6 +341,8 @@ export function TrackTableView({
           onToggleFavorite={onToggleFavorite}
           onReorderPlaylist={onReorderPlaylist}
           renderActions={renderActions}
+          currentTrackId={currentTrackId}
+          onPlayRow={onPlayRow}
         />
       </table>
     );
@@ -305,6 +352,7 @@ export function TrackTableView({
     <table className="track-table">
       <thead>
         <tr>
+          <th>#</th>
           <th>标题</th>
           <th>艺人</th>
           <th>专辑</th>
@@ -324,6 +372,8 @@ export function TrackTableView({
             onReorderPlaylist={onReorderPlaylist}
             rowsLength={rows.length}
             renderActions={renderActions}
+            currentTrackId={currentTrackId}
+            onPlayRow={onPlayRow}
           />
         ))}
       </tbody>

@@ -434,6 +434,87 @@ body,
   font-size: 13px;
 }
 
+.track-table__row {
+  transition: background 0.15s ease;
+}
+
+.track-table__row:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .track-table__row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.track-table__row--playing {
+  background: rgba(250, 35, 62, 0.08);
+}
+
+[data-theme="dark"] .track-table__row--playing {
+  background: rgba(250, 35, 62, 0.12);
+}
+
+.track-table__row--playing .track-table__title {
+  color: var(--color-apple-red);
+}
+
+.track-table__number-cell {
+  position: relative;
+  padding-left: 8px;
+  width: 40px;
+}
+
+.track-table__row--playing .track-table__number-cell::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--color-apple-red);
+  border-radius: 0 2px 2px 0;
+}
+
+.track-table__number {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.track-table__number-text {
+  transition: opacity 0.15s ease;
+}
+
+.track-table__number-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-size: 10px;
+}
+
+.track-table__row:hover .track-table__number-text {
+  opacity: 0;
+}
+
+.track-table__row:hover .track-table__number-icon {
+  opacity: 1;
+}
+
+.track-table__row--playing .track-table__number-text {
+  opacity: 0;
+}
+
+.track-table__row--playing .track-table__number-icon {
+  opacity: 1;
+}
+
 .track-table th {
   text-align: left;
   padding: 8px 12px;

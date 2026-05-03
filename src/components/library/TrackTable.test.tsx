@@ -129,6 +129,47 @@ describe("TrackTable", () => {
     expect(screen.getAllByTestId("track-row")).toHaveLength(3);
   });
 
+  it("renders table rows with interaction class hooks", () => {
+    const tracks = [baseTrack];
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
+    const rows = screen.getAllByTestId("track-row");
+    expect(rows[0]).toHaveClass("track-table__row");
+  });
+
+  it("sets aria-current on the currently playing row", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore");
+    usePlayerStore.setState({ current: { id: 2, title: "B", albumName: null, artistName: null, durationMs: 1000, coverPath: null } });
+    const tracks = [
+      baseTrack,
+      { ...baseTrack, id: 2, title: "B" },
+    ];
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
+    const rows = screen.getAllByTestId("track-row");
+    expect(rows[0]).not.toHaveAttribute("aria-current");
+    expect(rows[1]).toHaveAttribute("aria-current", "true");
+    // cleanup
+    usePlayerStore.setState({ current: null });
+  });
+
+  it("renders number cells with text and icon elements", () => {
+    const tracks = [baseTrack];
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
+    const numberCell = document.querySelector(".track-table__number-cell");
+    expect(numberCell).toBeTruthy();
+    expect(
+      numberCell!.querySelector(".track-table__number-icon"),
+    ).toBeTruthy();
+  });
+
+  it("calls play when a row is double-clicked", () => {
+    play.mockReset();
+    const tracks = [baseTrack];
+    render(<TrackTable tracks={tracks} queueContext="songs" virtual={false} />);
+    const rows = screen.getAllByTestId("track-row");
+    fireEvent.doubleClick(rows[0]!);
+    expect(play).toHaveBeenCalledWith(1, [1], 0);
+  });
+
   it("renders all rows in non-virtual mode", () => {
     const rows: TrackTableRow[] = [
       {
