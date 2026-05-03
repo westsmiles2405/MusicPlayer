@@ -1,0 +1,282 @@
+/* ── Dopamine Empty State ─────────────────────────────────────── */
+
+.dopamine-empty {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 48px 16px;
+  text-align: center;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+/* Gradient background via pseudo-element (transform-driven) */
+.dopamine-empty::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(
+    135deg,
+    var(--gradient-1) 0%,
+    var(--gradient-2) 50%,
+    var(--gradient-3) 100%
+  );
+  filter: blur(48px);
+  opacity: 0.4;
+  z-index: 0;
+  animation: gradient-drift 12s ease-in-out infinite;
+}
+
+/* Depth orbs */
+.dopamine-empty__orbs {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dopamine-empty__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.3;
+}
+
+.dopamine-empty__orb--one {
+  width: 250px;
+  height: 250px;
+  top: -40px;
+  left: -40px;
+  background: radial-gradient(circle, var(--gradient-1) 0%, transparent 70%);
+  animation: orb-float 8s ease-in-out infinite;
+}
+
+.dopamine-empty__orb--two {
+  width: 200px;
+  height: 200px;
+  bottom: -30px;
+  right: -30px;
+  background: radial-gradient(circle, var(--gradient-2) 0%, transparent 70%);
+  animation: orb-float 10s ease-in-out infinite reverse;
+}
+
+.dopamine-empty__orb--three {
+  width: 180px;
+  height: 180px;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--gradient-3) 0%, transparent 70%);
+  animation: orb-float 12s ease-in-out infinite 2s;
+}
+
+/* Content */
+.dopamine-empty__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Icon wrapper */
+.dopamine-empty__icon-wrap {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dopamine-empty__glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(
+    circle,
+    var(--accent) 0%,
+    transparent 70%
+  );
+  opacity: 0.3;
+  border-radius: 50%;
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.dopamine-empty__icon {
+  position: relative;
+  z-index: 1;
+  color: var(--accent);
+  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
+/* Sparkles */
+.dopamine-empty__sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dopamine-empty__sparkle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dopamine-empty__sparkle--1 {
+  top: 5px;
+  left: 20px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.dopamine-empty__sparkle--2 {
+  bottom: 15px;
+  left: 5px;
+  background: var(--gradient-2);
+  box-shadow: 0 0 10px var(--gradient-2);
+  animation: sparkle 2.5s ease-in-out infinite 0.5s;
+}
+
+.dopamine-empty__sparkle--3 {
+  top: 25px;
+  right: 10px;
+  background: var(--gradient-3);
+  box-shadow: 0 0 10px var(--gradient-3);
+  animation: sparkle 3s ease-in-out infinite 1s;
+}
+
+/* Notes */
+.dopamine-empty__notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dopamine-empty__note {
+  position: absolute;
+  font-size: 20px;
+  color: var(--accent);
+  opacity: 0.6;
+}
+
+.dopamine-empty__note--1 {
+  top: -10px;
+  right: -5px;
+  animation: note-drift 3s ease-in-out infinite;
+}
+
+.dopamine-empty__note--2 {
+  top: 30px;
+  left: -15px;
+  animation: note-drift 4s ease-in-out infinite 0.8s;
+}
+
+/* Typography */
+.dopamine-empty__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.dopamine-empty__desc {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 280px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dopamine-empty__action {
+  margin-top: 16px;
+}
+
+/* ── Animation Intensity Modifiers ────────────────────────────── */
+
+/* subtle: no sparkles/notes, slower cycle */
+.dopamine-empty[data-animation="subtle"] .dopamine-empty__sparkles,
+.dopamine-empty[data-animation="subtle"] .dopamine-empty__notes {
+  display: none;
+}
+
+.dopamine-empty[data-animation="subtle"]::before {
+  animation-duration: 16s;
+}
+
+.dopamine-empty[data-animation="subtle"] .dopamine-empty__icon {
+  animation: float-icon 6s ease-in-out infinite;
+}
+
+/* minimal: gradient only, no float, no sparkles, glow stays */
+.dopamine-empty[data-animation="minimal"] .dopamine-empty__sparkles,
+.dopamine-empty[data-animation="minimal"] .dopamine-empty__notes {
+  display: none;
+}
+
+.dopamine-empty[data-animation="minimal"]::before {
+  animation-duration: 20s;
+}
+
+.dopamine-empty[data-animation="minimal"] .dopamine-empty__icon {
+  animation: none;
+}
+
+/* full: everything active */
+.dopamine-empty[data-animation="full"] .dopamine-empty__icon {
+  animation: float-icon 4s ease-in-out infinite;
+}
+
+/* ── Keyframes ────────────────────────────────────────────────── */
+
+@keyframes gradient-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(5%, 3%) scale(1.05); }
+  50% { transform: translate(-3%, 5%) scale(1.02); }
+  75% { transform: translate(3%, -5%) scale(1.04); }
+}
+
+@keyframes orb-float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(15px, 15px); }
+}
+
+@keyframes float-icon {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-8deg); }
+  50% { transform: translate3d(0, -10px, 0) rotate(-5deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.08); }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.5); }
+  50% { opacity: 1; transform: translate3d(0, -5px, 0) scale(1); }
+}
+
+@keyframes note-drift {
+  0% { opacity: 0; transform: translate3d(0, 10px, 0) rotate(0deg); }
+  50% { opacity: 0.7; }
+  100% { opacity: 0; transform: translate3d(0, -20px, 0) rotate(15deg); }
+}
+
+/* ── Reduced Motion ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .dopamine-empty,
+  .dopamine-empty *,
+  .dopamine-empty::before,
+  .dopamine-empty::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
