@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { Outlet, useNavigate } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { LayoutGroup } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MiniPlayer, NowPlayingOverlay } from "@/components/player";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -22,6 +22,7 @@ export function AppShell() {
   const closeNowPlaying = useUIStore((s) => s.closeNowPlaying);
   const shellRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (phase === "done" && lastPhase.current !== "done") {
@@ -74,7 +75,17 @@ export function AppShell() {
             <ChevronRight size={16} />
           </button>
         </div>
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </main>
       <LayoutGroup id="now-playing">
         <MiniPlayer />
