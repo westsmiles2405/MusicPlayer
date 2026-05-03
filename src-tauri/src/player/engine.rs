@@ -355,6 +355,8 @@ impl AudioEngine {
     fn pause(&mut self) {
         if self.snapshot.status == PlaybackStatus::Playing {
             self.snapshot.status = PlaybackStatus::Paused;
+            self.audio.clear();
+            self.pending_samples.clear();
             let _ = self
                 .event_tx
                 .send(PlayerEvent::Snapshot(self.snapshot.clone()));
