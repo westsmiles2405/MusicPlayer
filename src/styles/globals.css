@@ -9,6 +9,14 @@
 
 :root {
   color-scheme: light dark;
+  /* 信息密度 — 对齐 macOS 8pt 网格 */
+  --sidebar-width: 220px;
+  --content-padding-y: 20px;
+  --content-padding-x: 24px;
+  --grid-gap: 12px;
+  --track-row-height: 34px;
+  --page-header-size: 22px;
+  --page-header-margin: 16px;
 }
 
 [data-theme="dark"] {
@@ -237,7 +245,7 @@ body,
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
+  gap: var(--grid-gap);
 }
 .album-grid__item {
   display: flex;
@@ -273,10 +281,10 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: var(--page-header-margin);
 }
 .page-header h1 {
-  font-size: 24px;
+  font-size: var(--page-header-size);
   font-weight: 700;
   margin: 0;
 }
@@ -549,7 +557,9 @@ body,
 }
 
 .track-table td {
-  padding: 8px 12px;
+  height: var(--track-row-height);
+  padding: 0 12px;
+  vertical-align: middle;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -580,7 +590,7 @@ body,
   --mouse-x: 50%;
   --mouse-y: 50%;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   background:
@@ -604,7 +614,7 @@ body,
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: 24px 28px 96px;
+  padding: var(--content-padding-y) var(--content-padding-x) 96px;
 }
 
 .sidebar {
