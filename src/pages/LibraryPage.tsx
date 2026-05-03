@@ -7,6 +7,7 @@ import { artistRepo } from "@/repositories/artistRepo";
 import { playlistRepo } from "@/repositories/playlistRepo";
 import { libraryRepo } from "@/repositories/libraryRepo";
 import { useScanProgress } from "@/hooks/useScanProgress";
+import { DopamineEmptyState } from "@/components/ui";
 
 export default function LibraryPage() {
   const qc = useQueryClient();
@@ -49,22 +50,19 @@ export default function LibraryPage() {
 
   if ((tracks.data?.length ?? 0) === 0 && phase !== "scanning") {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center gap-4">
-        <div className="text-6xl" aria-hidden="true">
-          {"🎵"}
-        </div>
-        <h2 className="text-xl font-semibold">尚未添加音乐</h2>
-        <p className="text-sm text-gray-500 max-w-sm">
-          选择一个文件夹，开始构建你的资料库。MusicPlayer 会扫描其中的 mp3 / m4a
-          / flac / wav / aac 文件。
-        </p>
-        <button
-          onClick={onAddFolder}
-          className="px-4 py-2 rounded-md bg-black text-white hover:bg-black/80"
-        >
-          添加音乐文件夹
-        </button>
-      </div>
+      <DopamineEmptyState
+        context="library"
+        title="资料库为空"
+        description="添加一些歌曲来开始你的音乐之旅"
+        action={
+          <button
+            onClick={onAddFolder}
+            className="px-4 py-2 rounded-md bg-black text-white hover:bg-black/80"
+          >
+            添加音乐文件夹
+          </button>
+        }
+      />
     );
   }
 
