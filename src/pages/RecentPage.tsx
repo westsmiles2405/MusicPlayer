@@ -7,8 +7,10 @@ import {
   ErrorState,
 } from "@/components/layout";
 import { DopamineEmptyState } from "@/components/ui";
+import { useToggleFavoriteMutation } from "@/hooks/useToggleFavoriteMutation";
 
 export default function RecentPage() {
+  const toggleFavorite = useToggleFavoriteMutation();
   const tracks = useQuery({
     queryKey: ["recentlyAdded", 100],
     queryFn: () => trackRepo.recentlyAdded(100),
@@ -29,7 +31,14 @@ export default function RecentPage() {
         />
       )}
       {tracks.data && tracks.data.length > 0 && (
-        <TrackTable tracks={tracks.data} queueContext="songs" />
+        <TrackTable
+          tracks={tracks.data}
+          queueContext="songs"
+          showFavorite
+          onToggleFavorite={(track, favorite) =>
+            toggleFavorite.mutate({ track, favorite })
+          }
+        />
       )}
     </>
   );

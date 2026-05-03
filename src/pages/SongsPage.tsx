@@ -5,6 +5,7 @@ import { playlistRepo } from "@/repositories/playlistRepo";
 import { TrackTable } from "@/components/library/TrackTable";
 import { PageHeader, LoadingState, ErrorState } from "@/components/layout";
 import { DopamineEmptyState } from "@/components/ui";
+import { useToggleFavoriteMutation } from "@/hooks/useToggleFavoriteMutation";
 
 const SORTS: { label: string; value: TrackSort }[] = [
   { label: "按标题", value: "title" },
@@ -16,6 +17,7 @@ const SORTS: { label: string; value: TrackSort }[] = [
 export default function SongsPage() {
   const [sort, setSort] = useState<TrackSort>("title");
   const queryClient = useQueryClient();
+  const toggleFavorite = useToggleFavoriteMutation();
 
   const tracks = useQuery({
     queryKey: ["tracks", sort],
@@ -79,6 +81,10 @@ export default function SongsPage() {
           tracks={tracks.data}
           queueContext="songs"
           playlists={playlists.data ?? []}
+          showFavorite
+          onToggleFavorite={(track, favorite) =>
+            toggleFavorite.mutate({ track, favorite })
+          }
           onAddToPlaylist={(track, playlistId) =>
             addToPlaylist.mutateAsync({ trackId: track.id, playlistId })
           }

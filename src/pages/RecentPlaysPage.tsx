@@ -10,9 +10,11 @@ import {
   ErrorState,
 } from "@/components/layout";
 import { DopamineEmptyState } from "@/components/ui";
+import { useToggleFavoriteMutation } from "@/hooks/useToggleFavoriteMutation";
 
 export default function RecentPlaysPage() {
   const queryClient = useQueryClient();
+  const toggleFavorite = useToggleFavoriteMutation();
 
   const recentPlays = useQuery({
     queryKey: ["recentPlays"],
@@ -58,7 +60,7 @@ export default function RecentPlaysPage() {
       {recentPlays.data?.length === 0 && (
         <DopamineEmptyState
           context="recent"
-          title="最近播放为空"
+          title="还没有最近播放记录"
           description="播放过的歌曲会出现在这里"
         />
       )}
@@ -67,6 +69,10 @@ export default function RecentPlaysPage() {
           tracks={tracks}
           queueContext="songs"
           playlists={playlists.data ?? []}
+          showFavorite
+          onToggleFavorite={(track, favorite) =>
+            toggleFavorite.mutate({ track, favorite })
+          }
           onAddToPlaylist={(track, playlistId) =>
             addToPlaylist.mutateAsync({ trackId: track.id, playlistId })
           }
